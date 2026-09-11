@@ -5,41 +5,48 @@ title = "Site"
 
 # Site
 
-This spec concerns aspects common across the entire site. s0001 governs the product direction, including mobile-centric, portrait-first responsive UI.
+Site-wide requirements; product direction is in s0001.
 
-## Existing requirements
+## Principles
 
-- TypeScript 7 is used.
-- The build step should be light (no Babel in particular).
-- The site will be published via GitHub Pages.
-- The site shall support multiple languages (i18n).
+### Reusable musical foundations
 
-## Foundation milestone — UNIMPLEMENTED
+- Separate musical data/operations, application workflows, audio implementation, and UI.
+- Musical data must support atypical temperaments and complex beats; do not make twelve-tone equal temperament or a fixed beat grid universal assumptions.
+- Reusable music code is independent of UI frameworks, DOM, and browser audio objects. The application composes implementations and owns their lifecycle.
+- Keep editable musical data, UI state, and transient playback state separate. Future sequencing operates independently of UI rendering.
 
-t0001 delivers an empty website, foundational codebase, and build system. It also makes this spec concrete enough to govern that implementation; further specs may be created where adequate.
+### Prevent debt without speculative infrastructure
 
-The foundation must support modular, maintainable growth into utilities and eventually a fully fledged DAW. Preventing future technical debt is a primary design constraint, not a later cleanup task.
+- Keep modules small, responsibilities explicit, and dependencies one-way.
+- Use package exports, declared dependencies, and code review. No dedicated architecture-analysis framework.
+- Introduce shared packages with real callers. Defer a global store, plugin system, persistence, workers, and DAW infrastructure until needed.
+- Keep specs concise: principles first, requirements next, open decisions last.
 
-## Chord utility milestone — UNIMPLEMENTED
+### Accessible, mobile-first presentation
 
-t0002 adds the utility specified in s0003 and reusable sound code specified in s0004. Foundational UX is in scope; non-essential features and intricate design are outside this milestone.
+- Prioritize portrait layouts, semantic HTML, keyboard access, visible focus, and zoom.
+- Use native modern CSS: nesting, variables, and logical properties; no SCSS.
+- Separate display text from musical identifiers and reusable logic. Prepare for localization without implementing translations yet.
 
-Multi-language support remains a site requirement for future delivery. Non-English support is explicitly outside t0002; this milestone does not require translated UI.
+## Foundation — t0001
 
-## Proposed foundation acceptance criteria — NEEDS APPROVAL
+- Deliver a blank website with document metadata, viewport settings, and minimal base styles.
+- Use Preact, Vite, Node.js 24 LTS, and pnpm in a small workspace. No Babel.
+- Use stable TypeScript 7; TypeScript 6 is permitted only for substantial, documented tooling incompatibility.
+- Extend recommended strict TypeScript configs. Prohibit explicit and implicit `any` in project code; browser-independent code must not receive DOM globals.
+- Use Oxlint and Prettier without complicating the stack for TS7 compatibility. Provide editor integration.
+- Pin tool versions and direct dependencies, commit one lockfile, and support Windows-compatible install, development, check, build, and preview commands.
+- Use static HTML entry pages for separate utilities, with a centralized hosting base path.
+- Publish GitHub Pages artifacts through Actions after checks pass on `main`, with a manual trigger. Default to `/rechorder/`; permit an explicit build base for other hosting paths.
 
-- A fresh checkout has documented install, development, type-check, and production-build commands, with explicit runtime and package-manager requirements and reproducible dependency resolution.
-- The production output is a static site compatible with GitHub Pages, including asset resolution under its configured base path. Publishing is governed by the existing GitHub Pages requirement; the deployment target and mechanism must be settled during refinement.
-- The empty website loads without application errors at mobile portrait and desktop sizes. It does not contain demo features or speculative DAW UI.
-- Document module responsibilities and dependency direction: application composition and UI may depend on reusable music and audio contracts; reusable music logic must not depend on page components or a UI framework. Audio implementation details remain behind an explicit boundary.
-- Keep the build lightweight and Babel-free. Verify TypeScript 7 availability and compatibility when selecting the toolchain; do not silently substitute another version or assume the latest release.
-- Establish checks that protect meaningful module boundaries and build correctness. Do not create unused abstractions or a generic DAW framework to satisfy hypothetical requirements.
+## Verification
 
-## Decisions to resolve during t0001 — NEEDS APPROVAL
+- CI checks formatting, lint, types, and the production build using a frozen lockfile.
+- Check built assets, the blank surface, and application errors with Playwright where adequate browsers exist. Record browser unavailability as a skip, never a pass.
+- Target current and previous major iOS Safari, Android Chrome, and desktop Chrome/Edge, Firefox, and Safari. Record actual tested versions; humans also test target devices.
+- Add focused Vitest tests as reusable logic arrives in t0002; no placeholder unit tests for the blank site.
 
-- Framework or UI approach, build tool, package manager, supported runtime and browser baseline, and exact compatible dependency versions.
-- Directory/module structure, enforceable dependency rules, and the minimum checks needed to keep those boundaries intact.
-- Meaning of the empty site shell, GitHub Pages base path, and deployment workflow.
-- How future localization can be added without coupling reusable music/audio code to UI text; no translation work is implied by this proposal.
+## Next milestone — t0002, UNIMPLEMENTED
 
-These are open choices, not selected technologies or approved product behavior. Record agreed decisions here, or in a focused additional spec, before implementing dependent work.
+Implement s0003 and s0004. The home page may gain a simple feature list; a decorated landing page and non-English support remain later work.

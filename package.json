@@ -1,0 +1,29 @@
+{
+  "name": "rechorder",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.34.5",
+  "engines": {
+    "node": ">=24.11.1 <25"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @rechorder/web dev",
+    "typecheck": "tsc --project tsconfig.tools.json && tsc --project tsconfig.browser-tests.json && pnpm --filter @rechorder/web typecheck",
+    "lint": "oxlint --deny-warnings",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "check": "pnpm format:check && pnpm lint && pnpm typecheck",
+    "build": "pnpm typecheck && pnpm --filter @rechorder/web build",
+    "preview": "pnpm --filter @rechorder/web preview",
+    "test:browser": "playwright test"
+  },
+  "devDependencies": {
+    "@types/node": "24.13.4",
+    "@playwright/test": "1.63.0",
+    "@tsconfig/node24": "24.0.5",
+    "@tsconfig/strictest": "2.0.8",
+    "oxlint": "1.82.0",
+    "prettier": "3.9.6",
+    "typescript": "7.0.2"
+  }
+}

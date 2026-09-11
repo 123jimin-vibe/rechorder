@@ -3,13 +3,13 @@
 # Omitted policies default to propose for specs and draft for tasks and notes.
 
 [spec]
-# Unapproved agent-authored content MUST be marked NEEDS APPROVAL.
-agent_mode = "draft"
+# Agents MAY change content without routine human approval.
+agent_mode = "autonomous"
 
 [task]
-# Unapproved agent-authored content MUST be marked NEEDS APPROVAL.
-agent_mode = "draft"
+# Agents MAY change content without routine human approval.
+agent_mode = "autonomous"
 
 [note]
-# Unapproved agent-authored content MUST be marked NEEDS APPROVAL.
-agent_mode = "draft"
+# Agents MAY change content without routine human approval.
+agent_mode = "autonomous"

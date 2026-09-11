@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.cache/
+.pnpm-store/
+pnpm-lock.yaml
+playwright-report/
+test-results/
+worklog/spec/s0001-meta-spec.md
+worklog/project.toml

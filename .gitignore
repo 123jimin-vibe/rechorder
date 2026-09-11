@@ -1,0 +1,40 @@
+# Dependencies and package-manager caches (all workspace packages)
+node_modules/
+.pnpm-store/
+
+# Build output and tool caches
+dist/
+.cache/
+.vite/
+*.tsbuildinfo
+vite.config.*.timestamp-*
+
+# Tests and coverage
+playwright-report/
+playwright/.cache/
+test-results/
+coverage/
+blob-report/
+
+# Local environment files; keep shareable templates
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# Diagnostic logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Machine-specific editor files; keep shared VS Code configuration
+.idea/
+*.suo
+*.user
+*.swp
+*.swo
+
+# Operating-system metadata
+.DS_Store
+Thumbs.db
+Desktop.ini

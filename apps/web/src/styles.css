@@ -1,0 +1,39 @@
+:root {
+  font-family: system-ui, sans-serif;
+  line-height: 1.5;
+  --surface: #fff;
+  --text: #171717;
+  --focus: #185adb;
+
+  color: var(--text);
+  background: var(--surface);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-inline-size: 0;
+}
+
+main {
+  min-block-size: 100svh;
+}
+
+:where(button, input, select, textarea) {
+  font: inherit;
+
+  &:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+}
+
+a:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
