@@ -11,6 +11,7 @@ title = "Chord Progression"
 - Deliver foundational UX; exclude non-essential features and intricate design.
 - Reuse musical operations and sound contracts outside this page. s0004 governs sound.
 - Expect automatic progression playback soon; implement only individual-chord playback in t0002.
+- Use s0005 for chord, pitch, tuning, voicing, and future musical-time semantics.
 
 ## Required in t0002 — UNIMPLEMENTED
 
@@ -19,12 +20,21 @@ title = "Chord Progression"
 - A display of the notes currently sounding.
 - Optionally, a simple feature list on the home page; decoration comes later.
 
-## Details to settle in t0002
+## Editor contract
 
-- Chord vocabulary/input, note naming, register/voicing, and invalid-input behavior.
-- Cursor positions and movement after edits, candidate-versus-stored-chord behavior, and touch/keyboard reorder interactions.
-- Playback defaults and retrigger policy with s0004; note-display behavior on completion, interruption, and failure.
-- Verify empty/single-item lists, boundaries, repeated chords, and edit/playback consistency.
+- Start with an empty progression and a C-major candidate. Changing a control never plays or inserts it.
+- Root and chord-type selectors create the candidate. Show its derived symbol and spelled notes. Invalid input is impossible through this UI.
+- Play and Insert are separate actions. Candidate edits never change stored entries.
+- The cursor denotes a position between entries. Insert there, then advance it after the new entry.
+- Preserve the cursor before its following entry through unrelated edits. It remains at the end when no following entry exists; when its anchor is removed, use the next surviving entry.
+- Select entries by stable ID. Reorder the selected entry with Move left/right controls; unavailable moves are disabled. Drag-and-drop is deferred.
+- Keep the list horizontally scrollable and compact. Scroll an explicit cursor move or insertion into view.
+- Display the active, sounding note labels with register. Candidate notes are not claimed as sounding.
+- An audition is an immutable snapshot. Reorder does not change it; removing its source entry stops it.
+
+## Verification
+
+Check empty and single-item lists, list boundaries, repeated chords, cursor movement, reorder, candidate isolation, and playback target consistency.
 
 ## Future features — excluded from t0002
 

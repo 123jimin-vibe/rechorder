@@ -22,6 +22,7 @@ Site-wide requirements; product direction is in s0001.
 - Use package exports, declared dependencies, and code review. No dedicated architecture-analysis framework.
 - Introduce shared packages with real callers. Defer a global store, plugin system, persistence, workers, and DAW infrastructure until needed.
 - Keep specs concise: principles first, requirements next, open decisions last.
+- When runtime schemas are needed for untrusted or external values, prefer ArkType. Do not add schemas solely to mirror trusted TypeScript values.
 
 ### Accessible, mobile-first presentation
 
