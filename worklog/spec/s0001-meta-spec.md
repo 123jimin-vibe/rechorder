@@ -10,7 +10,7 @@ agent_mode = "read_only"
 
 ## Features
 
-- Intuitive DAW, UX optimized for quickly transcribing melody 
+- Intuitive DAW, UX optimized for quickly transcribing earworm melodies.
 - Intuitive application of advanced music theory concepts.
 - Experiment with microtonals.
 - Multiple utilities focused on music analysis.
