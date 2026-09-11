@@ -5,7 +5,7 @@ modifies = ["s0002"]
 status = "pending"
 +++
 
-# Create foundation (NEEDS APPROVAL)
+# Create foundation
 
 ## Requested outcome
 
@@ -13,7 +13,7 @@ Deliver an empty website, foundational codebase, and build system. Make the mini
 
 The user explicitly requested these outcomes. The proposed execution and acceptance details below require content approval where they go beyond the request and existing specs.
 
-## Proposed work — NEEDS APPROVAL
+## Proposed work
 
 1. Refine s0002 against s0001: settle the empty-site deliverable, compatible toolchain, build/development commands, mobile baseline, and GitHub Pages build/deployment requirements. Preserve the existing TypeScript 7 and no-Babel constraints; surface incompatibilities instead of silently changing them.
 2. Define a small module structure and dependency rules that support the later chord utility and reusable music/audio code. Record reasoning, likely change points, and how boundaries are checked. Avoid building unused DAW infrastructure.
@@ -21,7 +21,7 @@ The user explicitly requested these outcomes. The proposed execution and accepta
 4. Implement the empty responsive site, foundational structure, and reproducible lightweight build system.
 5. Verify the production build and static-hosting behavior; document setup, checks, module boundaries, and the extension path for t0002.
 
-## Proposed completion conditions — NEEDS APPROVAL
+## Proposed completion conditions
 
 - [ ] s0002 concretely governs the delivered foundation; any additional governing specs are listed in `modifies`, with required proposals resolved.
 - [ ] A fresh checkout can follow documented commands to install, develop, type-check, and produce the static site using the selected versions.
