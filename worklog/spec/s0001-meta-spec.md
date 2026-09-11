@@ -19,4 +19,4 @@ agent_mode = "read_only"
 
 - Uses modern web technologies.
 - Published via GitHub Pages.
-- Mobile-centric, responsive UI.
+- Mobile-centric (especially for portrait), responsive UI.
