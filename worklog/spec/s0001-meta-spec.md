@@ -12,8 +12,9 @@ agent_mode = "read_only"
 
 - Intuitive DAW, UX optimized for quickly transcribing earworm melodies.
 - Intuitive application of advanced music theory concepts.
-- Experiment with microtonals.
 - Multiple utilities focused on music analysis.
+- Complex/variable time signatures and atypical temperaments will be supported.
+  - UX should remain simple, especially for when typical decisions are made on time signatures and temperaments. 
 
 ## Implementations
 
