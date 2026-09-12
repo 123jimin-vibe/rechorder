@@ -1,180 +1,151 @@
 import { expect, test } from '@playwright/test';
 import { installAudioProbe } from './audio-probe';
 
-test('editing preserves identities, candidate isolation, and insertion anchors', async ({
-  page,
-}) => {
-  await page.goto('./chord-progression/');
-  const cards = page.locator('[data-entry-id]');
-  const insert = page.getByRole('button', { name: 'Insert chord' });
-  const remove = page.getByRole('button', { name: 'Remove', exact: true });
-  await expect(remove).toBeDisabled();
-  await expect(page.getByLabel('Currently playing notes')).toHaveText(
-    'No notes playing',
-  );
-  await insert.click();
-  await insert.click();
-  const ids = await cards.evaluateAll((elements) =>
-    elements.map((element) => element.getAttribute('data-entry-id')),
-  );
-  expect(new Set(ids).size).toBe(2);
-  await page
-    .getByRole('button', {
-      name: 'Set insertion point at position 2',
-      exact: true,
-    })
-    .click();
-  await page
-    .getByRole('combobox', { name: 'Root', exact: true })
-    .selectOption('D♭');
-  await page.getByLabel('Chord type').selectOption('minor');
-  await insert.click();
-  await expect(cards.locator('strong')).toHaveText(['C', 'D♭m', 'C']);
-  await expect(
-    page.getByRole('button', {
-      name: 'Insert D♭m at position 3',
-      exact: true,
-    }),
-  ).toHaveAttribute('data-insertion-active', 'true');
-  await page.getByRole('button', { name: 'Move right', exact: true }).click();
-  await expect(cards.locator('strong')).toHaveText(['C', 'C', 'D♭m']);
-  // The insertion point follows the same C entry when it moves left.
-  await expect(
-    page.getByRole('button', {
-      name: 'Insert D♭m at position 2',
-      exact: true,
-    }),
-  ).toHaveAttribute('data-insertion-active', 'true');
-  await expect(
-    page.getByRole('button', { name: 'Move right', exact: true }),
-  ).toBeDisabled();
-  await page
-    .getByRole('button', { name: 'Select chord 2: C', exact: true })
-    .click();
-  await expect(
-    page.getByRole('combobox', { name: 'Root', exact: true }),
-  ).toHaveValue('D♭');
-  await expect(page.getByLabel('Chord type')).toHaveValue('minor');
-  await remove.click();
-  await expect(cards.locator('strong')).toHaveText(['C', 'D♭m']);
-  await expect(
-    page.getByRole('button', {
-      name: 'Insert D♭m at position 2',
-      exact: true,
-    }),
-  ).toHaveAttribute('data-insertion-active', 'true');
-  await remove.click();
-  await remove.click();
-  await expect(cards).toHaveCount(0);
-  await expect(remove).toBeDisabled();
-  await expect(
-    page.getByRole('button', {
-      name: 'Insert D♭m at position 1',
-      exact: true,
-    }),
-  ).toHaveAttribute('data-insertion-active', 'true');
-});
-
-test('the insertion preview shows and inserts the candidate exactly where placed', async ({
-  page,
-}, testInfo) => {
-  await page.goto('./chord-progression/');
-  await expect(page.getByText(/Next chord goes/)).toHaveCount(0);
-  await page
-    .getByRole('button', { name: 'Insert C at position 1', exact: true })
-    .click();
-  await page
-    .getByRole('button', { name: 'Insert C at position 2', exact: true })
-    .click();
-  await page
-    .getByRole('button', {
-      name: 'Set insertion point at position 2',
-      exact: true,
-    })
-    .click();
-  await page
-    .getByRole('combobox', { name: 'Root', exact: true })
-    .selectOption('D');
-  await page
-    .getByRole('combobox', { name: 'Chord type', exact: true })
-    .selectOption('minor');
-  const preview = page.getByRole('button', {
-    name: 'Insert Dm at position 2',
-    exact: true,
-  });
-  await expect(preview).toHaveText('+ DmInsert');
-  const cards = page.locator('[data-entry-id]');
-  await expect(cards).toHaveCount(2);
-  const before = await cards.nth(0).boundingBox();
-  const gap = await preview.boundingBox();
-  const after = await cards.nth(1).boundingBox();
-  expect(
-    before &&
-      gap &&
-      after &&
-      before.x + before.width <= gap.x &&
-      gap.x + gap.width <= after.x,
-  ).toBe(true);
-  await page.screenshot({
-    path: testInfo.outputPath('insertion-preview.png'),
-    fullPage: true,
-  });
-  await preview.press('Enter');
-  await expect(cards.locator('strong')).toHaveText(['C', 'Dm', 'C']);
-  await expect(
-    page.getByRole('button', { name: 'Insert Dm at position 3', exact: true }),
-  ).toBeVisible();
-});
-
-test('a different chord starts immediately while the previous chord is sounding', async ({
+test('two direct choices audition a candidate without committing it', async ({
   page,
 }) => {
   await page.addInitScript(installAudioProbe);
   await page.goto('./chord-progression/');
-  await page.getByRole('button', { name: 'Insert chord', exact: true }).click();
-  await page
-    .getByRole('combobox', { name: 'Root', exact: true })
-    .selectOption('D');
-  await page
-    .getByRole('combobox', { name: 'Chord type', exact: true })
-    .selectOption('minor');
-  await page.getByRole('button', { name: 'Insert chord', exact: true }).click();
-  await page
-    .getByRole('button', { name: 'Play chord 1: C', exact: true })
-    .click();
-  await expect(page.getByLabel('Currently playing notes')).toHaveText('C3E3G3');
-  const initialResumes = await page.evaluate(
-    () => window.audioProbe.resumeCalls,
+  expect(await page.evaluate(() => window.audioProbe.contexts.length)).toBe(0);
+  await expect(page.getByRole('combobox')).toHaveCount(0);
+  await expect(
+    page.getByRole('group', { name: 'Root', exact: true }).getByRole('button'),
+  ).toHaveCount(21);
+  await expect(
+    page
+      .getByRole('group', { name: 'Chord type', exact: true })
+      .getByRole('button'),
+  ).toHaveCount(9);
+  await page.getByRole('button', { name: 'Root D♭', exact: true }).click();
+  await page.getByRole('button', { name: 'Minor', exact: true }).click();
+  await expect(page.getByLabel('Candidate chord')).toHaveText(
+    'D♭mD♭3 · F♭3 · A♭3',
   );
+  await expect(page.getByLabel('Currently playing notes')).toHaveText(
+    'D♭3F♭3A♭3',
+  );
+  await expect(page.locator('[data-entry-id]')).toHaveCount(0);
+  await expect(
+    page.getByRole('button', { name: 'Root D♭', exact: true }),
+  ).toHaveAttribute('aria-pressed', 'true');
+  await expect(
+    page.getByRole('button', { name: 'Minor', exact: true }),
+  ).toHaveAttribute('aria-pressed', 'true');
+  await expect(
+    page.getByRole('button', { name: 'Replace selected chord', exact: true }),
+  ).toBeDisabled();
+});
+
+test('append, load, replace, and backspace preserve musical values and identities', async ({
+  page,
+}) => {
+  await page.goto('./chord-progression/');
+  const cards = page.locator('[data-entry-id]');
+  const append = page.getByRole('button', {
+    name: 'Append chord',
+    exact: true,
+  });
+  const replace = page.getByRole('button', {
+    name: 'Replace selected chord',
+    exact: true,
+  });
+  const backspace = page.getByRole('button', {
+    name: 'Remove last chord',
+    exact: true,
+  });
+  await expect(backspace).toBeDisabled();
+  await append.click();
+  await page.getByRole('button', { name: 'Root D', exact: true }).click();
+  await page.getByRole('button', { name: 'Minor', exact: true }).click();
+  await expect(cards.locator('strong')).toHaveText(['C']);
+  await append.click();
+  await append.click();
+  const ids = await cards.evaluateAll((elements) =>
+    elements.map((element) => element.getAttribute('data-entry-id')),
+  );
+  expect(new Set(ids).size).toBe(3);
+  await cards.nth(0).click();
+  await expect(page.getByLabel('Candidate chord')).toHaveText('CC3 · E3 · G3');
+  await expect(page.getByLabel('Currently playing notes')).toHaveText('C3E3G3');
+  await page.getByRole('button', { name: 'Root G', exact: true }).click();
   await page
-    .getByRole('button', { name: 'Play chord 2: Dm', exact: true })
+    .getByRole('button', { name: 'Dominant seventh', exact: true })
     .click();
+  await expect(cards.locator('strong')).toHaveText(['C', 'Dm', 'Dm']);
+  await replace.click();
+  await expect(cards.locator('strong')).toHaveText(['G7', 'Dm', 'Dm']);
+  expect(
+    await cards.evaluateAll((elements) =>
+      elements.map((element) => element.getAttribute('data-entry-id')),
+    ),
+  ).toEqual(ids);
+  await backspace.click();
+  await expect(cards.locator('strong')).toHaveText(['G7', 'Dm']);
+  await expect(cards.nth(0)).toHaveAttribute('aria-pressed', 'true');
+  await expect(replace).toHaveText('↔ Replace #1');
+  await cards.nth(1).click();
+  await backspace.click();
+  await expect(replace).toBeDisabled();
+  await expect(page.getByLabel('Candidate chord')).toHaveText('DmD3 · F3 · A3');
+  await backspace.click();
+  await expect(cards).toHaveCount(0);
+  await expect(backspace).toBeDisabled();
+});
+
+test('timeline and type choices immediately replace a sounding audition', async ({
+  page,
+}) => {
+  await page.addInitScript(installAudioProbe);
+  await page.goto('./chord-progression/');
+  await page.getByRole('button', { name: 'Append chord', exact: true }).click();
+  const first = page.getByRole('button', {
+    name: 'Select and play chord 1: C',
+    exact: true,
+  });
+  await first.click();
+  await expect(page.getByLabel('Currently playing notes')).toHaveText('C3E3G3');
+  const before = await page.evaluate(() => ({
+    count: window.audioProbe.oscillators.length,
+    resumes: window.audioProbe.resumeCalls,
+    time: window.audioProbe.contexts[0]!.currentTime,
+  }));
+  await page.getByRole('button', { name: 'Minor', exact: true }).click();
   await expect
     .poll(() => page.evaluate(() => window.audioProbe.oscillators.length), {
       timeout: 300,
     })
-    .toBe(6);
+    .toBe(before.count + 3);
   const timing = await page.evaluate(() => ({
-    starts: window.audioProbe.starts,
+    start: window.audioProbe.starts.at(-1)!,
     resumes: window.audioProbe.resumeCalls,
   }));
-  expect(timing.resumes).toBe(initialResumes);
-  expect(timing.starts[3]! - timing.starts[0]!).toBeLessThan(0.5);
+  expect(timing.resumes).toBe(before.resumes);
+  expect(timing.start - before.time).toBeLessThan(0.3);
   await expect(page.getByLabel('Currently playing notes')).toHaveText(
-    'D3F3A3',
+    'C3E♭3G3',
     { timeout: 300 },
   );
+  await first.click();
+  await expect(page.getByLabel('Currently playing notes')).toHaveText(
+    'C3E3G3',
+    { timeout: 300 },
+  );
+  const count = await page.evaluate(() => window.audioProbe.oscillators.length);
+  await first.click();
   await expect
-    .poll(() => page.evaluate(() => window.audioProbe.energy()))
-    .toBeGreaterThan(0.01);
+    .poll(() => page.evaluate(() => window.audioProbe.oscillators.length))
+    .toBe(count + 3);
 });
 
-test('long progressions scroll within the page and remain keyboard operable', async ({
+test('compact long progressions scroll and controls remain keyboard operable', async ({
   page,
 }, testInfo) => {
   await page.goto('./chord-progression/');
-  const insert = page.getByRole('button', { name: 'Insert chord' });
-  for (let index = 0; index < 12; index++) await insert.click();
+  const append = page.getByRole('button', {
+    name: 'Append chord',
+    exact: true,
+  });
+  for (let index = 0; index < 20; index++) await append.click();
   const strip = page.getByRole('group', {
     name: 'Chord progression',
     exact: true,
@@ -190,94 +161,105 @@ test('long progressions scroll within the page and remain keyboard operable', as
   }));
   expect(layout.scroll).toBeGreaterThan(layout.width);
   expect(layout.page).toBeLessThanOrEqual(layout.viewport);
-  const first = page.getByRole('button', {
-    name: 'Select chord 1: C',
-    exact: true,
-  });
-  await first.focus();
+  const cards = page.locator('[data-entry-id]');
+  const dimensions = await cards.nth(0).boundingBox();
+  expect(dimensions?.width).toBeLessThanOrEqual(64);
+  expect(dimensions?.height).toBeLessThanOrEqual(64);
+  await cards.nth(0).focus();
   await page.keyboard.press('Space');
-  await expect(first).toHaveAttribute('aria-pressed', 'true');
-  await expect(
-    page.getByRole('button', { name: 'Move left', exact: true }),
-  ).toBeDisabled();
+  await expect(cards.nth(0)).toHaveAttribute('aria-pressed', 'true');
   await page.keyboard.press('Tab');
+  await expect(cards.nth(1)).toBeFocused();
+  const minor = page.getByRole('button', { name: 'Minor', exact: true });
+  await minor.focus();
+  await page.keyboard.press('Enter');
+  await expect(minor).toHaveAttribute('aria-pressed', 'true');
   await expect(
-    page.getByRole('button', { name: 'Play chord 1: C', exact: true }),
-  ).toBeFocused();
+    page.getByRole('button', {
+      name: /Move left|Move right|insertion|Insert chord/,
+    }),
+  ).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /Remove/ })).toHaveCount(1);
   await page.screenshot({
-    path: testInfo.outputPath('chord-editor.png'),
+    path: testInfo.outputPath('quick-transcription.png'),
     fullPage: true,
   });
 });
 
-test('individual chords render native audio and report sounding notes until silence', async ({
+test('plucked audio has pitched harmonics, decays, and reaches silence', async ({
   page,
 }) => {
   await page.addInitScript(installAudioProbe);
   await page.goto('./chord-progression/');
-  expect(await page.evaluate(() => window.audioProbe.contexts.length)).toBe(0);
-  await page.getByRole('button', { name: 'Insert chord' }).click();
   await page
-    .getByRole('combobox', { name: 'Root', exact: true })
-    .selectOption('D');
-  await page.getByLabel('Chord type').selectOption('minor');
-  expect(await page.evaluate(() => window.audioProbe.contexts.length)).toBe(0);
-  const sounding = page.getByLabel('Currently playing notes');
-  await page
-    .getByRole('button', { name: 'Play chord 1: C', exact: true })
+    .getByRole('button', { name: 'Play candidate', exact: true })
     .click();
-  await expect(sounding).toHaveText('C3E3G3');
+  await expect(page.getByLabel('Currently playing notes')).toHaveText('C3E3G3');
   await expect
     .poll(() => page.evaluate(() => window.audioProbe.energy()))
     .toBeGreaterThan(0.01);
-  const frequencies = await page.evaluate(() =>
-    window.audioProbe.oscillators.map((node) => node.frequency.value),
+  const onset = await page.evaluate(() => ({
+    energy: window.audioProbe.energy(),
+    start: window.audioProbe.starts[0]!,
+    frequencies: window.audioProbe.oscillators.map(
+      (node) => node.frequency.value,
+    ),
+    types: window.audioProbe.oscillators.map((node) => node.type),
+  }));
+  expect(onset.energy).toBeLessThan(0.3);
+  expect(onset.types).toEqual(['custom', 'custom', 'custom']);
+  expect(onset.frequencies[0]).toBeCloseTo(130.8128, 3);
+  expect(onset.frequencies[1]).toBeCloseTo(164.8138, 3);
+  expect(onset.frequencies[2]).toBeCloseTo(195.9977, 3);
+  await expect
+    .poll(() => page.evaluate(() => window.audioProbe.contexts[0]!.currentTime))
+    .toBeGreaterThan(onset.start + 0.65);
+  const tail = await page.evaluate(() => window.audioProbe.energy());
+  expect(tail).toBeLessThan(onset.energy);
+  await expect(page.getByLabel('Currently playing notes')).toHaveText(
+    'No notes playing',
   );
-  expect(frequencies).toHaveLength(3);
-  expect(frequencies[0]).toBeCloseTo(130.8128, 3);
-  expect(frequencies[1]).toBeCloseTo(164.8138, 3);
-  expect(frequencies[2]).toBeCloseTo(195.9977, 3);
-  await expect(sounding).toHaveText('No notes playing');
   await expect
     .poll(() => page.evaluate(() => window.audioProbe.energy()))
     .toBeLessThan(0.00001);
-  await page.getByRole('button', { name: 'Play candidate' }).click();
-  await expect(sounding).toHaveText('D3F3A3');
-  await page
-    .getByRole('combobox', { name: 'Root', exact: true })
-    .selectOption('E');
-  await expect(sounding).toHaveText('D3F3A3');
-  await expect(sounding).toHaveText('No notes playing');
 });
 
-test('removing an audition source stops audio; suspended contexts report silence', async ({
+test('removing or replacing a source cancels it; suspended audio resumes from a choice', async ({
   page,
 }) => {
   await page.addInitScript(installAudioProbe);
   await page.goto('./chord-progression/');
-  await page.getByRole('button', { name: 'Insert chord' }).click();
+  const append = page.getByRole('button', {
+    name: 'Append chord',
+    exact: true,
+  });
   const sounding = page.getByLabel('Currently playing notes');
+  await append.click();
+  await page.locator('[data-entry-id]').click();
+  await expect(sounding).toHaveText('C3E3G3');
   await page
-    .getByRole('button', { name: 'Play chord 1: C', exact: true })
+    .getByRole('button', { name: 'Replace selected chord', exact: true })
     .click();
-  await expect(sounding).toHaveText('C3E3G3');
-  await page.getByRole('button', { name: 'Remove', exact: true }).click();
   await expect(sounding).toHaveText('No notes playing', { timeout: 750 });
-  await expect
-    .poll(() => page.evaluate(() => window.audioProbe.energy()))
-    .toBeLessThan(0.00001);
-  await page.getByRole('button', { name: 'Play candidate' }).click();
+  await page.locator('[data-entry-id]').click();
   await expect(sounding).toHaveText('C3E3G3');
+  await page
+    .getByRole('button', { name: 'Remove last chord', exact: true })
+    .click();
+  await expect(sounding).toHaveText('No notes playing', { timeout: 750 });
+  await page
+    .getByRole('button', { name: 'Play candidate', exact: true })
+    .click();
   await page.evaluate(async () => {
     await window.audioProbe.contexts[0]?.suspend();
   });
   await expect(sounding).toHaveText('No notes playing');
-  await page.getByRole('button', { name: 'Play candidate' }).click();
+  await page.getByRole('button', { name: 'Major', exact: true }).click();
   await expect(sounding).toHaveText('C3E3G3');
   await expect(sounding).toHaveText('No notes playing');
 });
 
-test('audio failure is logged while the editor remains usable', async ({
+test('audio failure is logged while append and replace remain usable', async ({
   page,
 }) => {
   await page.addInitScript(() => {
@@ -292,7 +274,7 @@ test('audio failure is logged while the editor remains usable', async ({
     if (message.type() === 'error') errors.push(message.text());
   });
   await page.goto('./chord-progression/');
-  await page.getByRole('button', { name: 'Play candidate' }).click();
+  await page.getByRole('button', { name: 'Root D', exact: true }).click();
   await expect
     .poll(() =>
       errors.some((error) => error.includes('Chord playback failed.')),
@@ -301,6 +283,36 @@ test('audio failure is logged while the editor remains usable', async ({
   await expect(page.getByLabel('Currently playing notes')).toHaveText(
     'No notes playing',
   );
-  await page.getByRole('button', { name: 'Insert chord' }).click();
-  await expect(page.locator('[data-entry-id]')).toHaveCount(1);
+  await page.getByRole('button', { name: 'Append chord', exact: true }).click();
+  await page.getByRole('button', { name: 'Minor', exact: true }).click();
+  await page
+    .getByRole('button', { name: 'Replace selected chord', exact: true })
+    .click();
+  await expect(page.locator('[data-entry-id] strong')).toHaveText(['Dm']);
+});
+
+test('narrow portrait and zoom keep choices and commits within the page', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 320, height: 740 });
+  await page.goto('./chord-progression/');
+  await page.getByRole('button', { name: 'Root B♯', exact: true }).click();
+  await page
+    .getByRole('button', { name: 'Major seventh', exact: true })
+    .click();
+  await expect(page.getByLabel('Candidate chord')).toHaveText(
+    'B♯maj7B♯3 · D♯♯4 · F♯♯4 · A♯♯4',
+  );
+  await page.getByRole('button', { name: 'Append chord', exact: true }).click();
+  await page.evaluate(() => {
+    document.documentElement.style.fontSize = '200%';
+  });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
+  await page
+    .getByRole('button', { name: 'Replace selected chord', exact: true })
+    .click();
 });

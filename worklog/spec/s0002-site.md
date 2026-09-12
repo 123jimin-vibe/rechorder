@@ -28,6 +28,7 @@ Site-wide requirements; product direction is in s0001.
 
 - Prioritize portrait layouts, semantic HTML, keyboard access, visible focus, and zoom.
 - Use native modern CSS: nesting, variables, and logical properties; no SCSS.
+- Utility styling uses replaceable semantic palette tokens: warm neutral surfaces and teal accents initially. Keep selected states, readable contrast, and focus visible.
 - Separate display text from musical identifiers and reusable logic. Prepare for localization without implementing translations yet.
 
 ## Foundation — t0001

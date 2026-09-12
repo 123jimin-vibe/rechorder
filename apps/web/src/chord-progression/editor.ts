@@ -1,78 +1,55 @@
 import {
   entryIndex,
   insertEntry,
-  moveEntry,
   removeEntry,
+  replaceEntry,
 } from '@rechorder/music';
 import type { ProgressionEntry, WesternChord } from '@rechorder/music';
 
 export interface EditorState {
   readonly entries: readonly ProgressionEntry<WesternChord>[];
   readonly selectedId: string | null;
-  /** Null represents the end; otherwise the cursor stays before this entry. */
-  readonly beforeId: string | null;
 }
 
 export type EditorAction =
-  | { readonly type: 'insert'; readonly entry: ProgressionEntry<WesternChord> }
+  | { readonly type: 'append'; readonly entry: ProgressionEntry<WesternChord> }
   | { readonly type: 'select'; readonly id: string }
-  | { readonly type: 'cursor'; readonly beforeId: string | null }
-  | { readonly type: 'remove'; readonly id: string }
-  | { readonly type: 'move'; readonly id: string; readonly direction: -1 | 1 };
+  | { readonly type: 'replace'; readonly value: WesternChord }
+  | { readonly type: 'remove-last' };
 
-export const initialEditor: EditorState = {
-  entries: [],
-  selectedId: null,
-  beforeId: null,
-};
-
-export function cursorIndex(state: EditorState): number {
-  return state.beforeId === null
-    ? state.entries.length
-    : entryIndex(state.entries, state.beforeId);
-}
+export const initialEditor: EditorState = { entries: [], selectedId: null };
 
 export function editorReducer(
   state: EditorState,
   action: EditorAction,
 ): EditorState {
   switch (action.type) {
-    case 'insert':
+    case 'append':
       return {
-        ...state,
-        entries: insertEntry(state.entries, cursorIndex(state), action.entry),
+        entries: insertEntry(state.entries, state.entries.length, action.entry),
         selectedId: action.entry.id,
       };
     case 'select':
       entryIndex(state.entries, action.id);
       return { ...state, selectedId: action.id };
-    case 'cursor':
-      if (action.beforeId !== null) entryIndex(state.entries, action.beforeId);
-      return { ...state, beforeId: action.beforeId };
-    case 'remove': {
-      const index = entryIndex(state.entries, action.id);
+    case 'replace':
+      return state.selectedId === null
+        ? state
+        : {
+            ...state,
+            entries: replaceEntry(
+              state.entries,
+              state.selectedId,
+              action.value,
+            ),
+          };
+    case 'remove-last': {
+      const last = state.entries.at(-1);
+      if (!last) return state;
       return {
-        entries: removeEntry(state.entries, action.id),
-        beforeId:
-          state.beforeId === action.id
-            ? (state.entries[index + 1]?.id ?? null)
-            : state.beforeId,
-        selectedId:
-          state.selectedId === action.id
-            ? (state.entries[index + 1]?.id ??
-              state.entries[index - 1]?.id ??
-              null)
-            : state.selectedId,
+        entries: removeEntry(state.entries, last.id),
+        selectedId: state.selectedId === last.id ? null : state.selectedId,
       };
     }
-    case 'move':
-      return {
-        ...state,
-        entries: moveEntry(
-          state.entries,
-          action.id,
-          entryIndex(state.entries, action.id) + action.direction,
-        ),
-      };
   }
 }

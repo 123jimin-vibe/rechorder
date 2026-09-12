@@ -26,6 +26,18 @@ export function insertEntry<Value>(
   return [...entries.slice(0, index), entry, ...entries.slice(index)];
 }
 
+/** Replace musical content without changing the entry's identity or position. */
+export function replaceEntry<Value>(
+  entries: readonly ProgressionEntry<Value>[],
+  id: string,
+  value: Value,
+): readonly ProgressionEntry<Value>[] {
+  const index = entryIndex(entries, id);
+  return entries.map((entry, position) =>
+    position === index ? { id, value } : entry,
+  );
+}
+
 export function removeEntry<Value>(
   entries: readonly ProgressionEntry<Value>[],
   id: string,

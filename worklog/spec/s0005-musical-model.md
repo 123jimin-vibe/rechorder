@@ -16,7 +16,7 @@ title = "Musical Model"
 - A pitch has a musical identity and spelling. Tuning resolves it to frequency; sounding equality never erases spelling.
 - A chord stores a root, an interval-based definition, and a separate voicing. Its display symbol is derived presentation.
 - A progression entry has a stable ID. Identical chords remain distinct entries.
-- Editing operations are plain-data insert, remove, and move operations. Cursor/selection and playback state are outside the progression.
+- Editing operations are plain-data insert, replace, remove, and move operations. Replacement preserves entry identity. Selection and playback state are outside the progression; available UI actions are governed by s0003.
 - Resolve frequency only at the sound boundary. Validate external values there and at construction boundaries; use ArkType if a runtime schema is useful.
 - `@rechorder/music` owns generic pitch/interval/voicing types and a separate conventional adapter; it has no browser globals. See `docs/music-and-audio.md` for extension contracts.
 

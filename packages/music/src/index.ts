@@ -16,4 +16,10 @@ export {
   standardTuning,
 } from './western';
 export type { ProgressionEntry } from './progression';
-export { entryIndex, insertEntry, removeEntry, moveEntry } from './progression';
+export {
+  entryIndex,
+  insertEntry,
+  replaceEntry,
+  removeEntry,
+  moveEntry,
+} from './progression';

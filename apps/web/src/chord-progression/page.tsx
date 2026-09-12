@@ -1,4 +1,3 @@
-import { Fragment } from 'preact';
 import { useEffect, useMemo, useReducer, useRef, useState } from 'preact/hooks';
 import {
   chordDefinitions,
@@ -14,6 +13,11 @@ import type { ActiveNote } from '@rechorder/audio';
 import type { AuditionController } from './audition';
 import { editorReducer, initialEditor } from './editor';
 import styles from './editor.module.css';
+
+// Natural, flat, and sharp rows keep every spelling a single tap away.
+const rootPads = [0, -1, 1].flatMap((accidental) =>
+  roots.filter((root) => root.pitch.position.accidental === accidental),
+);
 
 function useSoundingNotes(
   controller: AuditionController,
@@ -45,15 +49,15 @@ export function EditorPage({
   readonly controller: AuditionController;
 }) {
   const [state, dispatch] = useReducer(editorReducer, initialEditor);
-  const [rootId, setRoot] = useState('C');
-  const [definitionId, setDefinition] = useState('major');
-  const [reveal, setReveal] = useState(0);
-  const cursorRef = useRef<HTMLButtonElement>(null);
-  const candidate = useMemo(
-    () => createChord(rootId, definitionId),
-    [rootId, definitionId],
-  );
+  const [candidate, setCandidate] = useState(() => createChord('C', 'major'));
+  const selectedRef = useRef<HTMLButtonElement>(null);
   const candidateNotes = useMemo(() => voiceChord(candidate), [candidate]);
+  const rootId = roots.find(
+    ({ pitch }) =>
+      pitch.position.letter === candidate.root.position.letter &&
+      pitch.position.accidental === candidate.root.position.accidental &&
+      pitch.position.octave === candidate.root.position.octave,
+  )?.id;
   const sounding = useSoundingNotes(controller);
   const uniqueNotes = [
     ...new Map(
@@ -66,12 +70,11 @@ export function EditorPage({
   const selected = state.entries[selectedIndex];
 
   useEffect(() => {
-    if (reveal > 0)
-      cursorRef.current?.scrollIntoView({
-        block: 'nearest',
-        inline: 'nearest',
-      });
-  }, [reveal]);
+    selectedRef.current?.scrollIntoView({
+      block: 'nearest',
+      inline: 'nearest',
+    });
+  }, [state.selectedId]);
 
   function play(chord: WesternChord, source: string) {
     try {
@@ -84,56 +87,22 @@ export function EditorPage({
     }
   }
 
-  function insert() {
-    dispatch({
-      type: 'insert',
-      entry: { id: crypto.randomUUID(), value: candidate },
-    });
-    setReveal((value) => value + 1);
-  }
-
-  function insertionPoint(index: number, beforeId: string | null) {
-    const active = state.beforeId === beforeId;
-    return (
-      <button
-        type="button"
-        class={styles['cursor']}
-        aria-label={
-          active
-            ? `Insert ${chordSymbol(candidate)} at position ${index + 1}`
-            : `Set insertion point at position ${index + 1}`
-        }
-        data-insertion-active={active}
-        title={active ? 'Insert chord here' : 'Move insertion preview here'}
-        ref={active ? cursorRef : null}
-        onClick={() => {
-          if (active) insert();
-          else {
-            dispatch({ type: 'cursor', beforeId });
-            setReveal((value) => value + 1);
-          }
-        }}
-      >
-        {active ? (
-          <>
-            <strong>+ {chordSymbol(candidate)}</strong>
-            <span>Insert</span>
-          </>
-        ) : (
-          <span aria-hidden="true">+</span>
-        )}
-      </button>
-    );
+  function auditionCandidate(chord: WesternChord) {
+    setCandidate(chord);
+    play(chord, 'candidate');
   }
 
   return (
     <main class={styles['shell']}>
-      <header>
-        <a href={import.meta.env.BASE_URL}>Rechorder</a>
+      <header class={styles['header']}>
+        <a href={import.meta.env.BASE_URL}>
+          Rechorder<span aria-hidden="true"> / </span>
+        </a>
         <h1>Chord progression</h1>
+        <p>Find the chord. Keep the idea.</p>
       </header>
 
-      <section aria-labelledby="progression-heading">
+      <section class={styles['timeline']} aria-labelledby="progression-heading">
         <div class={styles['sectionHeading']}>
           <h2 id="progression-heading">Progression</h2>
           <span>
@@ -141,138 +110,183 @@ export function EditorPage({
             {state.entries.length === 1 ? 'chord' : 'chords'}
           </span>
         </div>
-        <fieldset class={styles['strip']} aria-label="Chord progression">
-          {state.entries.map((entry, index) => (
-            <Fragment key={entry.id}>
-              {insertionPoint(index, entry.id)}
-              <div
-                class={styles['card']}
+        <div class={styles['timelineRow']}>
+          <fieldset class={styles['strip']} aria-label="Chord progression">
+            {state.entries.map((entry, index) => (
+              <button
+                key={entry.id}
+                type="button"
+                class={styles['chord']}
                 data-entry-id={entry.id}
-                data-selected={state.selectedId === entry.id}
+                aria-label={`Select and play chord ${index + 1}: ${chordSymbol(entry.value)}`}
+                aria-pressed={state.selectedId === entry.id}
+                ref={state.selectedId === entry.id ? selectedRef : null}
+                onClick={() => {
+                  dispatch({ type: 'select', id: entry.id });
+                  setCandidate(entry.value);
+                  play(entry.value, entry.id);
+                }}
               >
-                <button
-                  type="button"
-                  class={styles['selectChord']}
-                  aria-label={`Select chord ${index + 1}: ${chordSymbol(entry.value)}`}
-                  aria-pressed={state.selectedId === entry.id}
-                  onClick={() => dispatch({ type: 'select', id: entry.id })}
-                >
-                  <span class={styles['ordinal']}>{index + 1}</span>
-                  <strong>{chordSymbol(entry.value)}</strong>
-                </button>
-                <button
-                  type="button"
-                  aria-label={`Play chord ${index + 1}: ${chordSymbol(entry.value)}`}
-                  onClick={() => play(entry.value, entry.id)}
-                >
-                  Play
-                </button>
-              </div>
-            </Fragment>
-          ))}
-          {insertionPoint(state.entries.length, null)}
-          {state.entries.length === 0 && (
-            <p class={styles['empty']}>No chords yet.</p>
-          )}
-        </fieldset>
-        <fieldset class={styles['editing']} aria-label="Selected chord actions">
+                <span class={styles['ordinal']}>{index + 1}</span>
+                <strong>{chordSymbol(entry.value)}</strong>
+              </button>
+            ))}
+            {state.entries.length === 0 && (
+              <span class={styles['empty']}>Your progression starts here</span>
+            )}
+          </fieldset>
           <button
             type="button"
-            disabled={!selected || selectedIndex === 0}
+            class={styles['backspace']}
+            aria-label="Remove last chord"
+            title="Remove last chord"
+            disabled={state.entries.length === 0}
             onClick={() => {
-              if (selected)
-                dispatch({ type: 'move', id: selected.id, direction: -1 });
+              const last = state.entries.at(-1);
+              if (last) {
+                controller.stopSource(last.id);
+                dispatch({ type: 'remove-last' });
+              }
             }}
           >
-            Move left
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 24 24"
+              width="22"
+              height="22"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.7"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M9 5h12v14H9l-7-7Z" />
+              <path d="m12 9 6 6m0-6-6 6" />
+            </svg>
           </button>
+        </div>
+      </section>
+
+      <section class={styles['composer']} aria-label="Chord builder">
+        <div class={styles['candidateRow']}>
+          <div class={styles['candidate']} aria-label="Candidate chord">
+            <strong>{chordSymbol(candidate)}</strong>
+            <span>
+              {candidateNotes.map((note) => note.spelling).join(' · ')}
+            </span>
+          </div>
           <button
             type="button"
-            disabled={!selected || selectedIndex === state.entries.length - 1}
-            onClick={() => {
-              if (selected)
-                dispatch({ type: 'move', id: selected.id, direction: 1 });
-            }}
+            class={styles['replay']}
+            aria-label="Play candidate"
+            title="Play candidate"
+            onClick={() => play(candidate, 'candidate')}
           >
-            Move right
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 24 24"
+              width="18"
+              height="18"
+              fill="currentColor"
+            >
+              <path d="m8 5 11 7-11 7Z" />
+            </svg>
+            Listen
+          </button>
+        </div>
+
+        <div class={styles['choices']}>
+          <fieldset>
+            <legend>Root</legend>
+            <div class={styles['roots']}>
+              {rootPads.map((root) => (
+                <button
+                  type="button"
+                  key={root.id}
+                  aria-label={`Root ${root.id}`}
+                  aria-pressed={rootId === root.id}
+                  onClick={() =>
+                    auditionCandidate(
+                      createChord(root.id, candidate.definition.id),
+                    )
+                  }
+                >
+                  {root.id}
+                </button>
+              ))}
+            </div>
+          </fieldset>
+          <fieldset>
+            <legend>Chord type</legend>
+            <div class={styles['types']}>
+              {chordDefinitions.map((definition) => (
+                <button
+                  type="button"
+                  key={definition.id}
+                  aria-label={definition.label}
+                  aria-pressed={candidate.definition.id === definition.id}
+                  onClick={() => {
+                    if (rootId)
+                      auditionCandidate(createChord(rootId, definition.id));
+                  }}
+                >
+                  {definition.suffix || 'Major'}
+                  {definition.id === 'minor' && (
+                    <span class={styles['typeHint']}>Minor</span>
+                  )}
+                </button>
+              ))}
+            </div>
+          </fieldset>
+        </div>
+
+        <div class={styles['commits']}>
+          <button
+            type="button"
+            class={styles['primary']}
+            aria-label="Append chord"
+            onClick={() =>
+              dispatch({
+                type: 'append',
+                entry: { id: crypto.randomUUID(), value: candidate },
+              })
+            }
+          >
+            <span aria-hidden="true">＋</span> Append chord
           </button>
           <button
             type="button"
             disabled={!selected}
+            aria-label="Replace selected chord"
             onClick={() => {
               if (selected) {
                 controller.stopSource(selected.id);
-                dispatch({ type: 'remove', id: selected.id });
+                dispatch({ type: 'replace', value: candidate });
               }
             }}
           >
-            Remove
-          </button>
-        </fieldset>
-      </section>
-
-      <section aria-labelledby="candidate-heading">
-        <h2 id="candidate-heading">Add a chord</h2>
-        <div class={styles['fields']}>
-          <label>
-            Root
-            <select
-              value={rootId}
-              onChange={(event) => {
-                const value = event.currentTarget.value;
-                if (roots.some((root) => root.id === value)) setRoot(value);
-              }}
-            >
-              {roots.map((root) => (
-                <option key={root.id} value={root.id}>
-                  {root.id}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Chord type
-            <select
-              value={definitionId}
-              onChange={(event) => {
-                const value = event.currentTarget.value;
-                if (
-                  chordDefinitions.some((definition) => definition.id === value)
-                )
-                  setDefinition(value);
-              }}
-            >
-              {chordDefinitions.map((definition) => (
-                <option key={definition.id} value={definition.id}>
-                  {definition.label}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-        <div class={styles['candidate']} aria-label="Candidate chord">
-          <strong>{chordSymbol(candidate)}</strong>
-          <span>{candidateNotes.map((note) => note.spelling).join(' · ')}</span>
-        </div>
-        <div class={styles['editing']}>
-          <button type="button" onClick={() => play(candidate, 'candidate')}>
-            Play candidate
-          </button>
-          <button type="button" class={styles['primary']} onClick={insert}>
-            Insert chord
+            <span aria-hidden="true">↔</span>{' '}
+            {selected ? `Replace #${selectedIndex + 1}` : 'Replace selected'}
           </button>
         </div>
       </section>
 
-      <section aria-labelledby="playing-heading">
-        <h2 id="playing-heading">Now playing</h2>
+      <section class={styles['playingRow']} aria-labelledby="playing-heading">
+        <h2 id="playing-heading">
+          <span
+            class={styles['indicator']}
+            data-sounding={uniqueNotes.length > 0}
+            aria-hidden="true"
+          />
+          Now playing
+        </h2>
         <output
           class={styles['playing']}
           aria-label="Currently playing notes"
           aria-live="polite"
         >
           {uniqueNotes.length === 0 ? (
-            <span class={styles['hint']}>No notes playing</span>
+            <span class={styles['empty']}>No notes playing</span>
           ) : (
             uniqueNotes.map((note) => (
               <span

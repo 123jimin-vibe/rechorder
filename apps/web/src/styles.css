@@ -1,12 +1,21 @@
 :root {
   font-family: system-ui, sans-serif;
   line-height: 1.5;
-  --surface: #fff;
-  --text: #171717;
-  --focus: #185adb;
-
+  color-scheme: light;
+  /* Semantic tokens keep the initial warm-neutral / teal palette replaceable. */
+  --canvas: #f5f4ef;
+  --surface: #ffffff;
+  --text: #223531;
+  --muted: #60716a;
+  --border: #dce2dc;
+  --accent: #176b58;
+  --accent-hover: #105443;
+  --accent-soft: #e8f3ed;
+  --on-accent: #ffffff;
+  --shadow: #22353108;
+  --focus: var(--accent);
   color: var(--text);
-  background: var(--surface);
+  background: var(--canvas);
 }
 
 *,
@@ -14,25 +23,20 @@
 *::after {
   box-sizing: border-box;
 }
-
 body {
   margin: 0;
   min-inline-size: 0;
 }
-
 main {
   min-block-size: 100svh;
 }
-
 :where(button, input, select, textarea) {
   font: inherit;
-
   &:focus-visible {
     outline: 2px solid var(--focus);
     outline-offset: 2px;
   }
 }
-
 a:focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 2px;

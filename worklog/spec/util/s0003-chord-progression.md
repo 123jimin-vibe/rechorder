@@ -7,44 +7,30 @@ title = "Chord Progression"
 
 ## Principles
 
-- Follow s0002's modularity, atypical-temperament, and complex-beat requirements.
-- Deliver foundational UX; exclude non-essential features and intricate design.
-- Reuse musical operations and sound contracts outside this page. s0004 governs sound.
-- Expect automatic progression playback soon; implement only individual-chord playback in t0002.
-- Use s0005 for chord, pitch, tuning, voicing, and future musical-time semantics.
+- Optimize quick transcription (s0001): visible choices, immediate audition, compact progression, and deliberate commits.
+- Follow s0002's modularity and accessibility; s0004 governs audio and s0005 musical meaning.
+- Keep candidate edits, stored chords, selection, and playback separate. No intricate design or speculative DAW infrastructure.
 
-## Required in t0002
+## Editor
 
-- A compact, horizontally scrollable chord list: play each chord, remove, reorder, and move an insertion cursor.
-- A UI to specify and play a candidate chord, then insert it into the list.
-- A display of the notes currently sounding.
-- Optionally, a simple feature list on the home page; decoration comes later.
+- Start empty with a C-major candidate; do not play on page load.
+- Show all catalogue roots and chord types as direct buttons. Tapping either updates and immediately auditions the candidate; tapping it again replays it. Show its symbol and spelled notes.
+- The horizontal timeline contains compact chord buttons. Tapping one selects it by stable ID, loads its value into the candidate controls, and immediately plays it.
+- **Append chord** adds the candidate at the end and selects the new entry. **Replace selected** changes only the selected entry's value, preserving its ID and position; disable it when nothing is selected. Neither commit adds another audition.
+- One accessible backspace button always removes the last entry, regardless of selection. Preserve an earlier selection; if the selected last entry is removed, clear selection. Keep the candidate available for reuse.
+- No cursor, insertion gaps, move buttons, per-item Play/Remove buttons, or drag reordering. Scroll newly appended or explicitly selected entries into view.
+- Keep the progression in memory without an arbitrary length cap. Candidate edits do not change entries until committed; repeated chords retain distinct IDs.
+- Display currently sounding note labels with register, including release tails. Auditions snapshot their notes; removing/replacing their source cancels that source's audition.
 
-## Editor contract
+## Presentation and verification
 
-- Start with an empty progression and a C-major candidate. Changing a control never plays or inserts it.
-- Root and chord-type selectors create the candidate. Show its derived symbol and spelled notes. Invalid input is impossible through this UI.
-- Play and Insert are separate actions. Candidate edits never change stored entries.
-- Keep the progression in memory without an arbitrary list-length cap. Selecting a stored entry leaves the candidate unchanged; change stored chords by removing and reinserting.
-- The cursor denotes a position between entries. Insert there, then advance it after the new entry.
-- Show that position as a dashed candidate preview with an Insert action directly in the chord strip. Small `+` buttons move the preview to other gaps. Do not rely on arrows or an explanatory position sentence. Candidate changes update the preview; clicking it inserts there.
-- Preserve the cursor before its following entry through unrelated edits. It remains at the end when no following entry exists; when its anchor is removed, use the next surviving entry.
-- Select entries by stable ID. Reorder the selected entry with Move left/right controls; unavailable moves are disabled. Drag-and-drop is deferred.
-- Insertion selects the new entry. Removing the selection chooses its successor, then predecessor, then none.
-- Keep the list horizontally scrollable and compact. Scroll an explicit cursor move or insertion into view.
-- Display the active, sounding note labels with register. Candidate notes are not claimed as sounding.
-- An audition is an immutable snapshot. Reorder does not change it; removing its source entry stops it.
+- Use a compact timeline, clear selected states, grouped root/type pads, and adjacent append/replace actions. Use basic surface, border, and accent styling through replaceable CSS variables.
+- Check empty/single/long lists, identity-preserving replacement, remove-last selection boundaries, candidate isolation, keyboard operation, rapid audition switching, and portrait overflow.
 
-## Verification
+## Future — excluded
 
-Check empty and single-item lists, list boundaries, repeated chords, cursor movement, reorder, candidate isolation, and playback target consistency.
+- Automatic progression playback (expected soon); BPM and beat lengths.
+- Drag reordering, non-English support, chord suggestions.
+- Soundfont/articulation, musical-scale, temperament, and voicing controls.
 
-## Future features — excluded from t0002
-
-- Automatic playback of the entire progression: expected soon.
-- Non-English support.
-- BPM, beat-length, soundfont, and articulation adjustment.
-- Chord suggestions.
-- Musical-scale and temperament adjustment.
-
-Supporting varied musical data does not require exposing these adjustment controls now.
+Supporting varied musical data does not require exposing these controls now.

@@ -19,12 +19,12 @@ Provide reusable individual-chord playback for candidate and list-item actions i
 
 ## Contract
 
-- Native Web Audio supplies a triangle-wave instrument. No soundfont assets are required.
-- An audition plays all resolved notes together for one second, including 10 ms attack and 100 ms release, with conservative gain normalized by voice count.
+- Native Web Audio supplies a plucked-string-style instrument: harmonic excitation with decaying brightness and amplitude. Keep instrument construction separate from engine scheduling; no soundfonts.
+- An audition plays all resolved notes together for one second, including a 5 ms attack and 100 ms release, with conservative gain normalized by voice count. Scale envelope segments for shorter scheduled notes.
 - The playback contract accepts resolved notes, audio-clock start time, and duration, and returns a cancellable handle with stable playback ID and lifecycle state.
 - One audition is active across the page. A new request starts immediately at the current audio time, without awaiting the previous chord, its release, or reinitialization of running audio. It releases the previous audition concurrently; the application applies this policy while the sound contract remains independently cancellable for future sequencing.
 - Report active notes and scheduled start/end through the playback lifecycle, including release. The note display follows that state.
-- Create/resume audio only from a Play gesture. The application owns disposal, stops sound on page hidden, and the latest request wins while initialization is pending.
+- Create/resume audio only from a user audition gesture (root/type choice, timeline selection, or candidate replay). The application owns disposal, stops sound on page hidden, and the latest request wins while initialization is pending.
 - On initialization or playback failure, log the error with `console.error` and keep editing usable. A snackbar replaces this reporting path later.
 
 ## Verification

@@ -4,10 +4,10 @@ import {
   insertEntry,
   moveEntry,
   removeEntry,
+  replaceEntry,
 } from '@rechorder/music';
 import type { EditorState } from '../../apps/web/src/chord-progression/editor';
 import {
-  cursorIndex,
   editorReducer,
   initialEditor,
 } from '../../apps/web/src/chord-progression/editor';
@@ -29,7 +29,16 @@ describe('progression operations', () => {
     expect(() => insertEntry(entries, 0, entry('a'))).toThrow();
     expect(() => removeEntry(entries, 'missing')).toThrow();
   });
-
+  it('replaces a value while retaining identity, order, and untouched entries', () => {
+    const value = createChord('D♭', 'minor7');
+    const next = replaceEntry(entries, 'b', value);
+    expect(next.map((item) => item.id)).toEqual(['a', 'b', 'c']);
+    expect(next[1]?.value).toBe(value);
+    expect(next[0]).toBe(entries[0]);
+    expect(next[2]).toBe(entries[2]);
+    expect(entries[1]?.value.definition.id).toBe('major');
+    expect(() => replaceEntry(entries, 'missing', value)).toThrow();
+  });
   it('moves every item to each final index without losing identity', () => {
     for (const source of entries)
       for (let destination = 0; destination < entries.length; destination++) {
@@ -43,49 +52,52 @@ describe('progression operations', () => {
 });
 
 describe('editor state', () => {
-  it('inserts repeatedly at the cursor and advances past each new entry', () => {
-    let state = editorReducer(initialEditor, {
-      type: 'insert',
-      entry: entry('a'),
-    });
-    state = editorReducer(state, { type: 'cursor', beforeId: 'a' });
-    state = editorReducer(state, { type: 'insert', entry: entry('b') });
-    state = editorReducer(state, { type: 'insert', entry: entry('c') });
-    expect(ids(state)).toEqual(['b', 'c', 'a']);
-    expect(cursorIndex(state)).toBe(2);
-    expect(state.selectedId).toBe('c');
+  it('always appends at the end and selects the new identity', () => {
+    let state: EditorState = { entries, selectedId: 'a' };
+    state = editorReducer(state, { type: 'append', entry: entry('d') });
+    state = editorReducer(state, { type: 'append', entry: entry('e') });
+    expect(ids(state)).toEqual(['a', 'b', 'c', 'd', 'e']);
+    expect(state.selectedId).toBe('e');
   });
-
-  it('follows the insertion anchor when entries are reordered', () => {
-    let state: EditorState = { entries, beforeId: 'b', selectedId: 'a' };
-    state = editorReducer(state, { type: 'move', id: 'b', direction: 1 });
-    expect(ids(state)).toEqual(['a', 'c', 'b']);
-    expect(cursorIndex(state)).toBe(2);
-    expect(state.selectedId).toBe('a');
+  it('replaces only the selection and safely ignores replacement without one', () => {
+    const value = createChord('G', 'dominant7');
+    const state = editorReducer(
+      { entries, selectedId: 'b' },
+      { type: 'replace', value },
+    );
+    expect(state.selectedId).toBe('b');
+    expect(ids(state)).toEqual(['a', 'b', 'c']);
+    expect(state.entries[1]?.value).toBe(value);
+    expect(editorReducer(initialEditor, { type: 'replace', value })).toBe(
+      initialEditor,
+    );
   });
-
-  it('moves a deleted anchor to its successor and repairs selection', () => {
-    let state: EditorState = { entries, beforeId: 'b', selectedId: 'b' };
-    state = editorReducer(state, { type: 'remove', id: 'b' });
-    expect(state.beforeId).toBe('c');
-    expect(state.selectedId).toBe('c');
-    state = editorReducer(state, { type: 'remove', id: 'c' });
-    expect(state.beforeId).toBeNull();
+  it('backspaces the last entry even with an earlier selection', () => {
+    let state: EditorState = { entries, selectedId: 'a' };
+    state = editorReducer(state, { type: 'remove-last' });
+    expect(ids(state)).toEqual(['a', 'b']);
     expect(state.selectedId).toBe('a');
-    state = editorReducer(state, { type: 'remove', id: 'a' });
+    state = editorReducer(state, { type: 'remove-last' });
+    expect(state.selectedId).toBe('a');
+    state = editorReducer(state, { type: 'remove-last' });
     expect(state).toEqual(initialEditor);
+    expect(editorReducer(state, { type: 'remove-last' })).toBe(state);
   });
-
-  it('preserves the end cursor and rejects stale selection/cursor IDs', () => {
-    const state: EditorState = { entries, beforeId: null, selectedId: null };
-    expect(
-      cursorIndex(
-        editorReducer(state, { type: 'move', id: 'a', direction: 1 }),
-      ),
-    ).toBe(3);
-    expect(() =>
-      editorReducer(state, { type: 'cursor', beforeId: 'missing' }),
-    ).toThrow();
+  it('clears a removed selection without silently choosing a different replacement target', () => {
+    const state = editorReducer(
+      { entries, selectedId: 'c' },
+      { type: 'remove-last' },
+    );
+    expect(ids(state)).toEqual(['a', 'b']);
+    expect(state.selectedId).toBeNull();
+  });
+  it('selects without modifying stored data and rejects stale IDs', () => {
+    const state = editorReducer(
+      { entries, selectedId: null },
+      { type: 'select', id: 'b' },
+    );
+    expect(state.entries).toBe(entries);
+    expect(state.selectedId).toBe('b');
     expect(() =>
       editorReducer(state, { type: 'select', id: 'missing' }),
     ).toThrow();

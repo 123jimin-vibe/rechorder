@@ -3,19 +3,19 @@
 ## Principles
 
 - Musical meaning survives changes to tuning, sound implementation, and UI.
-- Progression data, editor selection/cursor, and transient playback have separate owners.
+- Progression data, editor selection, candidate, and transient playback have separate owners.
 - Add concrete adapters and callers as features arrive; avoid speculative DAW infrastructure.
 
 ## Ownership
 
-| Module                                       | Responsibility                                                                  |
-| -------------------------------------------- | ------------------------------------------------------------------------------- |
-| `@rechorder/music`                           | Plain musical data, voicing/tuning resolution, immutable insert/remove/move     |
-| `@rechorder/audio`                           | Audio-clock scheduling, cancellation, sounding-note snapshots, voice cleanup    |
-| `apps/web/src/chord-progression/editor.ts`   | Pure editor reducer; stable selection and insertion anchor                      |
-| `apps/web/src/chord-progression/audition.ts` | Latest-request policy, one audition with release tails, console error reporting |
-| `apps/web/src/chord-progression/main.tsx`    | Service composition, page visibility and disposal                               |
-| `apps/web/src/chord-progression/page.tsx`    | Candidate controls, rendering, and user actions                                 |
+| Module                                       | Responsibility                                                                      |
+| -------------------------------------------- | ----------------------------------------------------------------------------------- |
+| `@rechorder/music`                           | Plain musical data, voicing/tuning resolution, immutable insert/replace/remove/move |
+| `@rechorder/audio`                           | Audio-clock scheduling, cancellation, sounding-note snapshots, voice cleanup        |
+| `apps/web/src/chord-progression/editor.ts`   | Pure editor reducer; append, replace selected, remove last, stable selection        |
+| `apps/web/src/chord-progression/audition.ts` | Latest-request policy, one audition with release tails, console error reporting     |
+| `apps/web/src/chord-progression/main.tsx`    | Service composition, page visibility and disposal                                   |
+| `apps/web/src/chord-progression/page.tsx`    | Candidate controls, rendering, and user actions                                     |
 
 Import reusable packages through their declared exports. Music has no Preact, DOM,
 or audio dependency. Audio consumes resolved notes and has no chord-theory or UI dependency.
@@ -36,8 +36,10 @@ unequal rational frequency ratios through the same resolution boundary.
 
 `ProgressionEntry<Value>` adds a stable ID to a value. Operations return new arrays;
 callers treat entries and their nested values as immutable. Repeated chords have
-distinct IDs. The editor stores its cursor as the following entry's ID, or `null`
-at the end; deleting that anchor chooses its successor. Selection never edits a chord.
+distinct IDs. Replacement preserves the selected ID and position. The page loads
+and auditions a selected entry, while root/type pads edit and audition a separate
+candidate. Only Append/Replace commit it. Backspace always removes the last entry;
+removing the selected entry clears selection, keeping the candidate for reuse.
 
 Inputs currently come from a fixed catalogue. Membership and numeric boundary checks
 are sufficient; no runtime schema library is needed. Prefer ArkType when future
@@ -45,7 +47,7 @@ imports, persistence, or other external structured data need schemas.
 
 ## Audio lifecycle
 
-`initialize()` lazily creates/resumes audio from a Play gesture. `schedule({ notes,
+`initialize()` lazily creates/resumes audio from a user audition gesture. `schedule({ notes,
 startTime, duration })` accepts seconds on `engine.currentTime` and returns a stable
 handle with `state` and `cancel()`. Past starts clamp to now. Each request copies its
 resolved notes; keys are unique within that playback. Cancellation releases current
@@ -56,9 +58,13 @@ scheduled, suspended, and finished voices are silent in this snapshot. The UI po
 it with animation frames only for display. Oscillators and envelopes use the audio clock.
 `stopAll()` stops immediately; `dispose()` also closes the context and is idempotent.
 
-The page requests a one-second triangle-wave audition (10 ms attack and 100 ms release
-included). When `engine.running` is true, new auditions schedule synchronously before
-releasing old ones; they never wait for an earlier chord or its release. Removing a source cancels its sound and
+The page requests a one-second plucked-string audition (5 ms attack and 100 ms release
+included). `plucked-string.ts` owns a shared normalized harmonic waveform and per-voice
+low-pass damping and amplitude decay; `web-audio.ts` owns the context. Both use native
+[Web Audio scheduling and waveform APIs](https://www.w3.org/TR/webaudio-1.0/).
+The timbre is synthesized, without samples or soundfonts. When `engine.running` is true,
+new auditions schedule synchronously before releasing old ones; they never wait for
+an earlier chord or its release. Removing or replacing a source cancels its sound and
 pending request. Hidden pages stop immediately; leaving disposes audio except when
 the browser preserves the page in its back/forward cache. Errors go to `console.error`;
 the controller's reporting callback can later show a snackbar.
