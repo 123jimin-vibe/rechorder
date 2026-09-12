@@ -6,10 +6,83 @@ import {
   resolvePitches,
   standardTuning,
   voiceChord,
+  alterChord,
+  chordRecipe,
+  jazzDefinitions,
+  pianoPitches,
+  roots,
 } from '@rechorder/music';
 import type { Pitch, Tuning } from '@rechorder/music';
 
 describe('conventional chord adapter', () => {
+  it('keeps the full catalogue, including extreme slash basses, inside the displayed piano range', () => {
+    const frequencies = resolvePitches(pianoPitches, standardTuning).map(
+      (note) => note.frequency,
+    );
+    const minimum = Math.min(...frequencies),
+      maximum = Math.max(...frequencies);
+    for (const root of roots)
+      for (const definition of [...chordDefinitions, ...jazzDefinitions])
+        for (const bass of roots) {
+          const notes = resolvePitches(
+            voiceChord(createChord(root.id, definition.id, bass.id)),
+            standardTuning,
+          );
+          expect(
+            notes.every(
+              (note) => note.frequency >= minimum && note.frequency <= maximum,
+            ),
+          ).toBe(true);
+        }
+  });
+  it('preserves slash spelling below the complete upper structure', () => {
+    const chord = createChord('C', 'major9', 'E');
+    expect(chordSymbol(chord)).toBe('Cmaj9/E');
+    expect(voiceChord(chord).map((pitch) => pitch.spelling)).toEqual([
+      'E2',
+      'C3',
+      'E3',
+      'G3',
+      'B3',
+      'D4',
+    ]);
+    expect(voiceChord(createChord('C♭', 'minor', 'B♯'))[0]?.spelling).toBe(
+      'B♯1',
+    );
+    expect(() => createChord('C', 'major', 'H')).toThrow();
+  });
+  it('voices jazz extensions and alterations without losing the editable recipe', () => {
+    const chord = alterChord(createChord('F♯', 'dominant13', 'E'), [
+      '♭9',
+      '♯11',
+    ]);
+    expect(chordSymbol(chord)).toBe('F♯13(♭9,♯11)/E');
+    expect(voiceChord(chord).map((pitch) => pitch.spelling)).toEqual([
+      'E3',
+      'F♯3',
+      'A♯3',
+      'C♯4',
+      'E4',
+      'G4',
+      'B♯4',
+      'D♯5',
+    ]);
+    expect(chordRecipe(chord)).toEqual({
+      definitionId: 'dominant13',
+      alterations: ['♭9', '♯11'],
+    });
+    expect(chordSymbol(alterChord(chord, []))).toBe('F♯13/E');
+    expect(() => alterChord(chord, ['♭9', '♯9'])).toThrow();
+    expect(voiceChord(createChord('C', 'diminished7')).at(-1)?.spelling).toBe(
+      'B♭♭3',
+    );
+    expect(
+      voiceChord(createChord('C', 'halfDiminished7')).at(-1)?.spelling,
+    ).toBe('B♭3');
+    expect(
+      voiceChord(createChord('C', 'sixNine')).map((pitch) => pitch.spelling),
+    ).toEqual(['C3', 'E3', 'G3', 'A3', 'D4']);
+  });
   it.each([
     ['major', ['C3', 'E3', 'G3']],
     ['minor', ['C3', 'E♭3', 'G3']],

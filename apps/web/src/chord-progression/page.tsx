@@ -1,4 +1,11 @@
-import { useEffect, useMemo, useReducer, useRef, useState } from 'preact/hooks';
+import {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+} from 'preact/hooks';
 import {
   chordDefinitions,
   chordSymbol,
@@ -12,12 +19,10 @@ import type { WesternChord } from '@rechorder/music';
 import type { ActiveNote } from '@rechorder/audio';
 import type { AuditionController } from './audition';
 import { editorReducer, initialEditor } from './editor';
+import { ChordOptions, rootPads } from './chord-options';
+import { MusicalText } from './musical-text';
+import { Piano } from './piano';
 import styles from './editor.module.css';
-
-// Align each root's sharp, natural, and flat spelling in one column.
-const rootPads = [1, 0, -1].flatMap((accidental) =>
-  roots.filter((root) => root.pitch.position.accidental === accidental),
-);
 
 function useSoundingNotes(
   controller: AuditionController,
@@ -50,7 +55,7 @@ export function EditorPage({
 }) {
   const [state, dispatch] = useReducer(editorReducer, initialEditor);
   const [candidate, setCandidate] = useState(() => createChord('C', 'major'));
-  const selectedRef = useRef<HTMLButtonElement>(null);
+  const previousLength = useRef(0);
   const stripRef = useRef<HTMLFieldSetElement>(null);
   const candidateNotes = useMemo(() => voiceChord(candidate), [candidate]);
   const rootId = roots.find(
@@ -67,25 +72,14 @@ export function EditorPage({
   ];
   const selected = state.entries.find((entry) => entry.id === state.selectedId);
 
-  useEffect(() => {
-    selectedRef.current?.scrollIntoView({
-      block: 'nearest',
-      inline: 'nearest',
-    });
-  }, [state.entries.length]);
-
-  function centerTimelineItem(element: HTMLButtonElement) {
+  useLayoutEffect(() => {
     const strip = stripRef.current;
-    if (!strip) return;
-    const itemBounds = element.getBoundingClientRect();
-    const stripBounds = strip.getBoundingClientRect();
-    const left =
-      strip.scrollLeft +
-      itemBounds.left -
-      stripBounds.left +
-      (itemBounds.width - stripBounds.width) / 2;
-    strip.scrollTo({ left, behavior: 'smooth' });
-  }
+    if (strip && state.entries.length > previousLength.current)
+      strip.scrollTo({ left: strip.scrollWidth });
+    // Preact refs are mutable lifecycle storage; this rule only recognizes React refs.
+    // oxlint-disable-next-line react/immutability
+    previousLength.current = state.entries.length;
+  }, [state.entries.length]);
 
   function play(chord: WesternChord, source: string) {
     try {
@@ -158,15 +152,15 @@ export function EditorPage({
                 data-entry-id={entry.id}
                 aria-label={`Select and play chord ${index + 1}: ${chordSymbol(entry.value)}`}
                 aria-pressed={state.selectedId === entry.id}
-                ref={state.selectedId === entry.id ? selectedRef : null}
-                onClick={(event) => {
-                  centerTimelineItem(event.currentTarget);
+                onClick={() => {
                   dispatch({ type: 'select', id: entry.id });
                   setCandidate(entry.value);
                   play(entry.value, entry.id);
                 }}
               >
-                <strong>{chordSymbol(entry.value)}</strong>
+                <strong>
+                  <MusicalText text={chordSymbol(entry.value)} />
+                </strong>
               </button>
             ))}
           </fieldset>
@@ -176,9 +170,13 @@ export function EditorPage({
       <section class={styles['composer']} aria-label="Chord builder">
         <div class={styles['candidateRow']}>
           <div class={styles['candidate']} aria-label="Candidate chord">
-            <strong>{chordSymbol(candidate)}</strong>
+            <strong>
+              <MusicalText text={chordSymbol(candidate)} />
+            </strong>
             <span>
-              {candidateNotes.map((note) => note.spelling).join(' · ')}
+              <MusicalText
+                text={candidateNotes.map((note) => note.spelling).join(' · ')}
+              />
             </span>
           </div>
           <button
@@ -211,12 +209,10 @@ export function EditorPage({
                   aria-label={`Root ${root.id}`}
                   aria-pressed={rootId === root.id}
                   onClick={() =>
-                    auditionCandidate(
-                      createChord(root.id, candidate.definition.id),
-                    )
+                    auditionCandidate({ ...candidate, root: root.pitch })
                   }
                 >
-                  {root.id}
+                  <MusicalText text={root.id} />
                 </button>
               ))}
             </div>
@@ -232,7 +228,10 @@ export function EditorPage({
                   aria-pressed={candidate.definition.id === definition.id}
                   onClick={() => {
                     if (rootId)
-                      auditionCandidate(createChord(rootId, definition.id));
+                      auditionCandidate({
+                        ...createChord(rootId, definition.id),
+                        ...(candidate.bass ? { bass: candidate.bass } : {}),
+                      });
                   }}
                 >
                   {definition.suffix || 'Major'}
@@ -244,6 +243,8 @@ export function EditorPage({
             </div>
           </fieldset>
         </div>
+
+        <ChordOptions chord={candidate} onChange={auditionCandidate} />
 
         <div class={styles['commits']}>
           <button
@@ -284,24 +285,7 @@ export function EditorPage({
           />
           Now playing
         </h2>
-        <output
-          class={styles['playing']}
-          aria-label="Currently playing notes"
-          aria-live="polite"
-        >
-          {uniqueNotes.length === 0 ? (
-            <span class={styles['empty']}>No notes playing</span>
-          ) : (
-            uniqueNotes.map((note) => (
-              <span
-                class={styles['note']}
-                key={note.label + ':' + note.frequency}
-              >
-                {note.label}
-              </span>
-            ))
-          )}
-        </output>
+        <Piano controller={controller} notes={uniqueNotes} />
       </section>
     </main>
   );

@@ -11,9 +11,13 @@ Similar mistakes from one session may be merged.
 
 Exclude self-corrected mistakes.
 
+### t0006: Timeline geometry and string sound
+
+The user reported vertical timeline scrolling, cropped chord buttons, unreliable append visibility, loose sharp spacing, and a keyboard-like synth timbre. Reserve space for native scrollbars and test complete button bounds, not just container height. Verify append and selection scrolling independently. A harmonic oscillator envelope alone did not achieve the requested string character. The user also superseded the earlier selection-centering requirement.
+
 ### t0005: Compact, steady touch layout
 
-The user found that the t0004 UI still used redundant copy and ordinals, wasted space in the body/timeline, let the erase button crowd the strip, and shifted around changing chord symbols. The timeline also failed to center a tapped chord, and the accidental rows put flats above naturals. Check actual mobile geometry and interaction states; use self-explanatory controls and fixed layout slots before adding explanatory text.
+The user found that the t0004 UI still used redundant copy and ordinals, wasted space in the body/timeline, let the erase button crowd the strip, and shifted around changing chord symbols. The timeline also failed to center a tapped chord, and the accidental rows did not follow sharp/natural/flat order. Check actual mobile geometry and interaction states; use self-explanatory controls and fixed layout slots before adding explanatory text.
 
 ### t0004: Optimize the actual transcription loop
 

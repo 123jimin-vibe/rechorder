@@ -14,6 +14,7 @@ export interface PlaybackRequest {
   readonly notes: readonly ResolvedNote[];
   readonly startTime: number;
   readonly duration: number;
+  readonly level?: number;
 }
 
 export interface PlaybackHandle {
@@ -107,6 +108,9 @@ export function createPlaybackEngine(
         throw new Error('Initialize audio before scheduling.');
       const clock = driver;
       const { startTime, duration } = request;
+      const level = request.level ?? 1;
+      if (!Number.isFinite(level) || level < 0 || level > 1)
+        throw new RangeError('Playback level must be between zero and one.');
       if (
         !Number.isFinite(startTime) ||
         startTime < 0 ||
@@ -158,7 +162,7 @@ export function createPlaybackEngine(
           playback.voices.push(
             clock.schedule(
               note.frequency,
-              0.18 / notes.length,
+              (0.18 * level) / notes.length,
               start,
               playback.end,
               () => {

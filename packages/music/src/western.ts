@@ -32,7 +32,7 @@ export type WesternChord = Chord<
   WesternPosition,
   WesternInterval,
   CloseVoicing
->;
+> & { readonly alterations: readonly ChordAlteration[] };
 
 function interval(
   diatonicSteps: number,
@@ -126,29 +126,41 @@ export const standardTuning: Tuning<WesternPosition> = {
 export function createChord(
   rootId: string,
   definitionId: string,
+  bassId?: string,
 ): WesternChord {
   const root = roots.find((item) => item.id === rootId)?.pitch;
-  const chordDefinition = chordDefinitions.find(
+  const chordDefinition = [...chordDefinitions, ...jazzDefinitions].find(
     (item) => item.id === definitionId,
   );
   if (!root || !chordDefinition)
     throw new RangeError('Unsupported root or chord type.');
+  const bass =
+    bassId === undefined
+      ? undefined
+      : roots.find((item) => item.id === bassId)?.pitch;
+  if (bassId !== undefined && !bass) throw new RangeError('Unsupported bass.');
   return {
     root,
+    alterations: [],
+    ...(bass ? { bass } : {}),
     definition: chordDefinition,
     voicing: { kind: 'root-position-close' },
   };
 }
 
 export function chordSymbol(chord: WesternChord): string {
-  return rootLabel(chord.root.position) + chord.definition.suffix;
+  return (
+    rootLabel(chord.root.position) +
+    chord.definition.suffix +
+    (chord.bass ? '/' + rootLabel(chord.bass.position) : '')
+  );
 }
 
 export function voiceChord(
   chord: WesternChord,
 ): readonly Pitch<WesternPosition>[] {
   const root = chord.root.position;
-  return chord.definition.intervals.map((value) => {
+  const pitches = chord.definition.intervals.map((value) => {
     const diatonic = letters.indexOf(root.letter) + value.diatonicSteps;
     const letter = letters[diatonic % letters.length];
     if (!letter) throw new RangeError('Invalid diatonic interval.');
@@ -157,4 +169,197 @@ export function voiceChord(
     const accidental = desired - ((octave + 1) * 12 + naturalSteps[letter]);
     return spelledPitch({ letter, octave, accidental });
   });
+  if (!chord.bass) return pitches;
+  // Keep the chord's complete upper structure; place the specified bass strictly below it.
+  const lowest = Math.min(
+    ...pitches.map((pitch) => chromaticPosition(pitch.position)),
+  );
+  const position = chord.bass.position;
+  const octave =
+    position.octave +
+    Math.ceil((lowest - chromaticPosition(position)) / 12) -
+    1;
+  return [spelledPitch({ ...position, octave }), ...pitches];
 }
+
+const majorThird = interval(2, 4);
+const minorThird = interval(2, 3);
+const fifth = interval(4, 7);
+const seventh = interval(6, 10);
+const majorSeventh = interval(6, 11);
+const ninth = interval(8, 14);
+const eleventh = interval(10, 17);
+const thirteenth = interval(12, 21);
+
+/** Explicit complete stacks; omission/voicing choices remain independent future controls. */
+export const jazzDefinitions: readonly ChordDefinition<WesternInterval>[] = [
+  definition('sixth', 'Sixth', '6', [majorThird, fifth, interval(5, 9)]),
+  definition('minor6', 'Minor sixth', 'm6', [
+    minorThird,
+    fifth,
+    interval(5, 9),
+  ]),
+  definition('sixNine', 'Six nine', '6/9', [
+    majorThird,
+    fifth,
+    interval(5, 9),
+    ninth,
+  ]),
+  definition('add9', 'Added ninth', 'add9', [majorThird, fifth, ninth]),
+  definition('minorAdd9', 'Minor added ninth', 'm(add9)', [
+    minorThird,
+    fifth,
+    ninth,
+  ]),
+  definition('minorMajor7', 'Minor major seventh', 'm(maj7)', [
+    minorThird,
+    fifth,
+    majorSeventh,
+  ]),
+  definition('diminished7', 'Diminished seventh', 'dim7', [
+    minorThird,
+    interval(4, 6),
+    interval(6, 9),
+  ]),
+  definition('halfDiminished7', 'Half diminished seventh', 'm7♭5', [
+    minorThird,
+    interval(4, 6),
+    seventh,
+  ]),
+  definition('dominant7sus4', 'Dominant seventh suspended fourth', '7sus4', [
+    interval(3, 5),
+    fifth,
+    seventh,
+  ]),
+  definition('dominant9', 'Dominant ninth', '9', [
+    majorThird,
+    fifth,
+    seventh,
+    ninth,
+  ]),
+  definition('major9', 'Major ninth', 'maj9', [
+    majorThird,
+    fifth,
+    majorSeventh,
+    ninth,
+  ]),
+  definition('minor9', 'Minor ninth', 'm9', [
+    minorThird,
+    fifth,
+    seventh,
+    ninth,
+  ]),
+  definition('dominant11', 'Dominant eleventh', '11', [
+    majorThird,
+    fifth,
+    seventh,
+    ninth,
+    eleventh,
+  ]),
+  definition('major11', 'Major eleventh', 'maj11', [
+    majorThird,
+    fifth,
+    majorSeventh,
+    ninth,
+    eleventh,
+  ]),
+  definition('minor11', 'Minor eleventh', 'm11', [
+    minorThird,
+    fifth,
+    seventh,
+    ninth,
+    eleventh,
+  ]),
+  definition('dominant13', 'Dominant thirteenth', '13', [
+    majorThird,
+    fifth,
+    seventh,
+    ninth,
+    eleventh,
+    thirteenth,
+  ]),
+  definition('major13', 'Major thirteenth', 'maj13', [
+    majorThird,
+    fifth,
+    majorSeventh,
+    ninth,
+    eleventh,
+    thirteenth,
+  ]),
+  definition('minor13', 'Minor thirteenth', 'm13', [
+    minorThird,
+    fifth,
+    seventh,
+    ninth,
+    eleventh,
+    thirteenth,
+  ]),
+];
+
+export const chordAlterations = [
+  { id: '♭5', interval: interval(4, 6) },
+  { id: '♯5', interval: interval(4, 8) },
+  { id: '♭9', interval: interval(8, 13) },
+  { id: '♯9', interval: interval(8, 15) },
+  { id: '♯11', interval: interval(10, 18) },
+  { id: '♭13', interval: interval(12, 20) },
+] as const;
+export type ChordAlteration = (typeof chordAlterations)[number]['id'];
+
+/** A definition remains interval-based; this adapter records editable modifiers explicitly. */
+export interface ChordRecipe {
+  readonly definitionId: string;
+  readonly alterations: readonly ChordAlteration[];
+}
+export function chordRecipe(chord: WesternChord): ChordRecipe {
+  return { definitionId: chord.definition.id, alterations: chord.alterations };
+}
+export function alterChord(
+  chord: WesternChord,
+  alterations: readonly ChordAlteration[],
+): WesternChord {
+  const recipe = chordRecipe(chord);
+  const base = [...chordDefinitions, ...jazzDefinitions].find(
+    (item) => item.id === recipe.definitionId,
+  );
+  if (!base) throw new RangeError('Unsupported chord definition.');
+  const selected = chordAlterations.filter((item) =>
+    alterations.includes(item.id),
+  );
+  if (
+    new Set(selected.map((item) => item.interval.diatonicSteps)).size !==
+    selected.length
+  )
+    throw new RangeError('Conflicting alterations.');
+  const intervals = [...base.intervals];
+  for (const item of selected) {
+    const index = intervals.findIndex(
+      (value) => value.diatonicSteps === item.interval.diatonicSteps,
+    );
+    if (index < 0) intervals.push(item.interval);
+    else intervals[index] = item.interval;
+  }
+  intervals.sort((a, b) => a.diatonicSteps - b.diatonicSteps);
+  return {
+    ...chord,
+    alterations: selected.map((item) => item.id),
+    definition: {
+      ...base,
+      suffix:
+        base.suffix +
+        (selected.length
+          ? '(' + selected.map((item) => item.id).join(',') + ')'
+          : ''),
+      intervals,
+    },
+  };
+}
+
+/** Keyboard coordinates stay in the western adapter, outside generic pitch types. */
+export const pianoPitches = [1, 2, 3, 4, 5].flatMap((octave) =>
+  letters.flatMap((letter) =>
+    (letter === 'E' || letter === 'B' ? [0] : [0, 1]).map((accidental) =>
+      spelledPitch({ letter, accidental, octave }),
+    ),
+  ),
+);

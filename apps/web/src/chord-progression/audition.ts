@@ -10,6 +10,7 @@ export class AuditionController {
   private revision = 0;
   private pendingSource: string | null = null;
   private disposed = false;
+  private readonly held = new Map<string, { handle?: PlaybackHandle }>();
   private readonly auditions = new Map<
     string,
     { handle: PlaybackHandle; source: string }
@@ -57,6 +58,33 @@ export class AuditionController {
     return this.engine.activeNotes();
   }
 
+  /** Each finger/key owns its release, including gestures released during audio resume. */
+  async press(source: string, note: ResolvedNote): Promise<void> {
+    if (this.disposed || this.held.has(source) || this.held.size >= 10) return;
+    const held: { handle?: PlaybackHandle } = {};
+    this.held.set(source, held);
+    try {
+      if (!this.engine.running) await this.engine.initialize();
+      if (this.disposed || this.held.get(source) !== held) return;
+      held.handle = this.engine.schedule({
+        notes: [note],
+        startTime: this.engine.currentTime,
+        duration: 4,
+        level: 0.25,
+      });
+    } catch (error) {
+      if (this.held.get(source) === held) {
+        this.held.delete(source);
+        this.reportError(error);
+      }
+    }
+  }
+
+  release(source: string): void {
+    this.held.get(source)?.handle?.cancel();
+    this.held.delete(source);
+  }
+
   stopSource(source: string): void {
     if (this.pendingSource === source) {
       this.revision++;
@@ -70,6 +98,7 @@ export class AuditionController {
   stopAll(): void {
     this.revision++;
     this.pendingSource = null;
+    this.held.clear();
     this.engine.stopAll();
     this.auditions.clear();
   }

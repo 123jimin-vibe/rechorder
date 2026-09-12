@@ -1,6 +1,137 @@
 import { expect, test } from '@playwright/test';
 import { installAudioProbe } from './audio-probe';
 
+test('jazz and slash chords round-trip through append and replace', async ({
+  page,
+}, testInfo) => {
+  await page.goto('./chord-progression/');
+  await page.getByText('Jazz & extensions', { exact: true }).click();
+  await page
+    .getByRole('button', { name: 'Dominant thirteenth', exact: true })
+    .click();
+  await page.getByRole('button', { name: 'Alter ♭9', exact: true }).click();
+  await page.getByRole('button', { name: 'Alter ♯11', exact: true }).click();
+  await page
+    .locator('summary')
+    .filter({ hasText: /^Bass$/ })
+    .click();
+  await page.getByRole('button', { name: 'Bass E', exact: true }).click();
+  await expect(page.getByLabel('Candidate chord').locator('strong')).toHaveText(
+    'C13(♭9,♯11)/E',
+  );
+  await page.getByRole('button', { name: 'Append', exact: true }).click();
+  await page.getByRole('button', { name: 'Root F♯', exact: true }).click();
+  await expect(page.getByLabel('Candidate chord').locator('strong')).toHaveText(
+    'F♯13(♭9,♯11)/E',
+  );
+  const entry = page.locator('[data-entry-id]');
+  const id = await entry.getAttribute('data-entry-id');
+  await entry.click();
+  await expect(
+    page.getByRole('button', { name: 'Alter ♭9', exact: true }),
+  ).toHaveAttribute('aria-pressed', 'true');
+  await expect(
+    page.getByRole('button', { name: 'Bass E', exact: true }),
+  ).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('button', { name: 'Alter ♯9', exact: true }).click();
+  await expect(
+    page.getByRole('button', { name: 'Alter ♭9', exact: true }),
+  ).toHaveAttribute('aria-pressed', 'false');
+  await page.getByRole('button', { name: 'Replace', exact: true }).click();
+  await expect(entry).toHaveText('C13(♯9,♯11)/E');
+  await expect(entry).toHaveAttribute('data-entry-id', id!);
+  expect(
+    await entry.evaluate(
+      (element) => element.scrollWidth <= element.clientWidth,
+    ),
+  ).toBe(true);
+  await page.getByRole('button', { name: 'Major', exact: true }).click();
+  await expect(page.getByLabel('Candidate chord').locator('strong')).toHaveText(
+    'C/E',
+  );
+  await page.getByRole('button', { name: 'No slash', exact: true }).click();
+  await expect(page.getByLabel('Candidate chord').locator('strong')).toHaveText(
+    'C',
+  );
+  await page.screenshot({
+    path: testInfo.outputPath('jazz-builder.png'),
+    fullPage: true,
+  });
+});
+
+test('piano highlights enharmonic pitches and releases independent touch and keyboard notes', async ({
+  page,
+}) => {
+  await page.goto('./chord-progression/');
+  const piano = page.getByRole('group', {
+    name: 'Piano keyboard',
+    exact: true,
+  });
+  await page.getByRole('button', { name: 'Root D♭', exact: true }).click();
+  await expect(
+    piano.getByRole('button', { name: 'Play C♯3', exact: true }),
+  ).toHaveAttribute('aria-pressed', 'true');
+  await expect(piano.getByRole('button', { pressed: true })).toHaveCount(3);
+  await expect(piano.getByRole('button', { pressed: true })).toHaveCount(0);
+  const c = piano.getByRole('button', { name: 'Play C3', exact: true });
+  const e = piano.getByRole('button', { name: 'Play E3', exact: true });
+  await c.scrollIntoViewIfNeeded();
+  const cBox = (await c.boundingBox())!;
+  const eBox = (await e.boundingBox())!;
+  const firstTouch = {
+    id: 11,
+    x: cBox.x + cBox.width / 2,
+    y: cBox.y + cBox.height - 15,
+  };
+  const secondTouch = {
+    id: 12,
+    x: eBox.x + eBox.width / 2,
+    y: eBox.y + eBox.height - 15,
+  };
+  const input = await page.context().newCDPSession(page);
+  await input.send('Input.dispatchTouchEvent', {
+    type: 'touchStart',
+    touchPoints: [firstTouch],
+  });
+  await input.send('Input.dispatchTouchEvent', {
+    type: 'touchStart',
+    touchPoints: [firstTouch, secondTouch],
+  });
+  await expect(c).toHaveAttribute('aria-pressed', 'true');
+  await expect(e).toHaveAttribute('aria-pressed', 'true');
+  await input.send('Input.dispatchTouchEvent', {
+    type: 'touchEnd',
+    touchPoints: [],
+  });
+  await expect(c).toHaveAttribute('aria-pressed', 'false');
+  await expect(e).toHaveAttribute('aria-pressed', 'false');
+  await input.send('Input.dispatchTouchEvent', {
+    type: 'touchStart',
+    touchPoints: [secondTouch],
+  });
+  await expect(e).toHaveAttribute('aria-pressed', 'true');
+  await input.send('Input.dispatchTouchEvent', {
+    type: 'touchCancel',
+    touchPoints: [],
+  });
+  await input.detach();
+  await expect(e).toHaveAttribute('aria-pressed', 'false');
+  await c.focus();
+  await page.keyboard.down('Space');
+  await expect(c).toHaveAttribute('aria-pressed', 'true');
+  await page.keyboard.up('Space');
+  await expect(c).toHaveAttribute('aria-pressed', 'false');
+  await page.getByRole('button', { name: 'C2', exact: true }).click();
+  await expect(
+    piano.getByRole('button', { name: 'Play C2', exact: true }),
+  ).toBeInViewport();
+  await page.getByRole('button', { name: 'C5', exact: true }).click();
+  await expect(
+    piano.getByRole('button', { name: 'Play B5', exact: true }),
+  ).toBeInViewport();
+  await expect(page.locator('[data-entry-id]')).toHaveCount(0);
+});
+
 test('two direct choices audition a candidate without committing it', async ({
   page,
 }) => {
@@ -147,13 +278,13 @@ test('timeline and type choices immediately replace a sounding audition', async 
   await first.click();
   await expect(page.getByLabel('Currently playing notes')).toHaveText('C3E3G3');
   const before = await page.evaluate(() => ({
-    count: window.audioProbe.oscillators.length,
+    count: window.audioProbe.sources.length,
     resumes: window.audioProbe.resumeCalls,
     time: window.audioProbe.contexts[0]!.currentTime,
   }));
   await page.getByRole('button', { name: 'Minor', exact: true }).click();
   await expect
-    .poll(() => page.evaluate(() => window.audioProbe.oscillators.length), {
+    .poll(() => page.evaluate(() => window.audioProbe.sources.length), {
       timeout: 300,
     })
     .toBe(before.count + 3);
@@ -172,10 +303,10 @@ test('timeline and type choices immediately replace a sounding audition', async 
     'C3E3G3',
     { timeout: 300 },
   );
-  const count = await page.evaluate(() => window.audioProbe.oscillators.length);
+  const count = await page.evaluate(() => window.audioProbe.sources.length);
   await first.click();
   await expect
-    .poll(() => page.evaluate(() => window.audioProbe.oscillators.length))
+    .poll(() => page.evaluate(() => window.audioProbe.sources.length))
     .toBe(count + 3);
 });
 
@@ -207,39 +338,36 @@ test('compact long progressions scroll and controls remain keyboard operable', a
   const dimensions = await cards.nth(0).boundingBox();
   expect(dimensions?.width).toBeLessThanOrEqual(64);
   expect(dimensions?.height).toBeLessThanOrEqual(64);
-  const middle = cards.nth(10);
-  await middle.click();
-  await expect
-    .poll(async () =>
-      strip.evaluate((element) => {
-        const selected = element.querySelector('[aria-pressed="true"]');
-        if (!selected) return Infinity;
-        const stripBounds = element.getBoundingClientRect();
-        const selectedBounds = selected.getBoundingClientRect();
-        return Math.abs(
-          selectedBounds.left +
-            selectedBounds.width / 2 -
-            (stripBounds.left + stripBounds.width / 2),
-        );
-      }),
-    )
-    .toBeLessThan(2);
+  const geometry = await strip.evaluate((element) => {
+    const bounds = element.getBoundingClientRect();
+    const last = element.lastElementChild!.getBoundingClientRect();
+    return {
+      top: last.top - bounds.top,
+      bottom: bounds.bottom - last.bottom,
+      right: bounds.right - last.right,
+      scrollHeight: element.scrollHeight,
+      height: element.clientHeight,
+    };
+  });
+  expect(geometry.scrollHeight).toBe(geometry.height);
+  expect(geometry.top).toBeGreaterThanOrEqual(2);
+  expect(geometry.bottom).toBeGreaterThanOrEqual(2);
+  expect(geometry.right).toBeGreaterThanOrEqual(-1);
   await strip.evaluate((element) => {
     element.scrollLeft = 0;
   });
+  const offset = await strip.evaluate((element) => element.scrollLeft);
+  await cards.nth(1).click();
+  expect(await strip.evaluate((element) => element.scrollLeft)).toBe(offset);
+  await cards.nth(1).click();
+  expect(await strip.evaluate((element) => element.scrollLeft)).toBe(offset);
+  await append.click();
   await expect
-    .poll(() => strip.evaluate((element) => element.scrollLeft))
-    .toBe(0);
-  await middle.click();
-  await expect
-    .poll(async () =>
-      strip.evaluate((element) => {
-        const selected = element.querySelector('[aria-pressed="true"]');
-        if (!selected) return Infinity;
-        const a = element.getBoundingClientRect();
-        const b = selected.getBoundingClientRect();
-        return Math.abs(b.left + b.width / 2 - a.left - a.width / 2);
-      }),
+    .poll(() =>
+      strip.evaluate(
+        (element) =>
+          element.scrollWidth - element.clientWidth - element.scrollLeft,
+      ),
     )
     .toBeLessThan(2);
   await cards.nth(0).focus();
@@ -278,16 +406,13 @@ test('plucked audio has pitched harmonics, decays, and reaches silence', async (
   const onset = await page.evaluate(() => ({
     energy: window.audioProbe.energy(),
     start: window.audioProbe.starts[0]!,
-    frequencies: window.audioProbe.oscillators.map(
-      (node) => node.frequency.value,
-    ),
-    types: window.audioProbe.oscillators.map((node) => node.type),
+    lengths: window.audioProbe.sources.map((node) => node.buffer!.length),
+    rates: window.audioProbe.sources.map((node) => node.playbackRate.value),
   }));
   expect(onset.energy).toBeLessThan(0.3);
-  expect(onset.types).toEqual(['custom', 'custom', 'custom']);
-  expect(onset.frequencies[0]).toBeCloseTo(130.8128, 3);
-  expect(onset.frequencies[1]).toBeCloseTo(164.8138, 3);
-  expect(onset.frequencies[2]).toBeCloseTo(195.9977, 3);
+  expect(onset.lengths).toHaveLength(3);
+  expect(onset.lengths.every((length) => length > 40000)).toBe(true);
+  expect(onset.rates.every((rate) => rate > 0.98 && rate < 1.02)).toBe(true);
   await expect
     .poll(() => page.evaluate(() => window.audioProbe.contexts[0]!.currentTime))
     .toBeGreaterThan(onset.start + 0.65);

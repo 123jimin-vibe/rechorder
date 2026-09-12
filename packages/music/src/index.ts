@@ -6,7 +6,13 @@ export type {
   ResolvedNote,
 } from './model';
 export { resolvePitches } from './model';
-export type { WesternChord, WesternPosition, WesternInterval } from './western';
+export type {
+  WesternChord,
+  WesternPosition,
+  WesternInterval,
+  ChordAlteration,
+  ChordRecipe,
+} from './western';
 export {
   chordDefinitions,
   roots,
@@ -14,6 +20,11 @@ export {
   chordSymbol,
   voiceChord,
   standardTuning,
+  jazzDefinitions,
+  chordAlterations,
+  chordRecipe,
+  alterChord,
+  pianoPitches,
 } from './western';
 export type { ProgressionEntry } from './progression';
 export {

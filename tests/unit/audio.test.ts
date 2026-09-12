@@ -97,6 +97,10 @@ describe('audio scheduling engine', () => {
     expect(() =>
       engine.schedule({ notes, startTime: 0, duration: 0 }),
     ).toThrow();
+    for (const level of [-1, 1.1, NaN, Infinity])
+      expect(() =>
+        engine.schedule({ notes, startTime: 0, duration: 1, level }),
+      ).toThrow();
     driver.failVoice = 1;
     expect(() => engine.schedule({ notes, startTime: 0, duration: 1 })).toThrow(
       'Instrument failed',
@@ -141,6 +145,31 @@ describe('audio scheduling engine', () => {
 });
 
 describe('page audition policy', () => {
+  it('owns independent held notes and suppresses released pending gestures', async () => {
+    const driver = new FakeDriver();
+    const ready = deferred();
+    driver.gate = ready.promise;
+    const controller = new AuditionController(
+      createPlaybackEngine(() => driver),
+    );
+    const cancelled = controller.press('finger1', notes[0]!);
+    controller.release('finger1');
+    const kept = controller.press('finger2', notes[1]!);
+    ready.resolve();
+    await Promise.all([cancelled, kept]);
+    expect(driver.voices.map((voice) => voice.frequency)).toEqual([660]);
+    await controller.press('finger3', notes[0]!);
+    controller.release('finger2');
+    driver.advance(0.11);
+    expect(controller.notes().map((item) => item.note.label)).toEqual(['A4']);
+    expect(driver.voices[1]?.gain).toBe(0.045);
+    controller.stopAll();
+    expect(controller.notes()).toEqual([]);
+    await controller.press('finger3', notes[0]!);
+    expect(controller.notes()).toHaveLength(1);
+    await controller.dispose();
+    expect(controller.notes()).toEqual([]);
+  });
   it('starts a replacement synchronously without resuming running audio or waiting for release', async () => {
     const driver = new FakeDriver();
     const controller = new AuditionController(

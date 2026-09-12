@@ -1,6 +1,6 @@
 interface AudioProbe {
   readonly contexts: AudioContext[];
-  readonly oscillators: OscillatorNode[];
+  readonly sources: AudioBufferSourceNode[];
   readonly starts: number[];
   resumeCalls: number;
   energy(): number;
@@ -15,12 +15,12 @@ declare global {
 /** Observe native audio, including its rendered waveform; no synthesized test output. */
 export function installAudioProbe(): void {
   const contexts: AudioContext[] = [];
-  const oscillators: OscillatorNode[] = [];
+  const sources: AudioBufferSourceNode[] = [];
   const starts: number[] = [];
   const analysers: AnalyserNode[] = [];
   window.audioProbe = {
     contexts,
-    oscillators,
+    sources,
     starts,
     resumeCalls: 0,
     energy() {
@@ -54,11 +54,11 @@ export function installAudioProbe(): void {
       return gain;
     }
 
-    override createOscillator(): OscillatorNode {
-      const oscillator = super.createOscillator();
+    override createBufferSource(): AudioBufferSourceNode {
+      const source = super.createBufferSource();
       starts.push(this.currentTime);
-      oscillators.push(oscillator);
-      return oscillator;
+      sources.push(source);
+      return source;
     }
 
     override resume(): Promise<void> {

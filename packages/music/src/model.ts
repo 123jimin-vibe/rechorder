@@ -18,6 +18,7 @@ export interface ChordDefinition<Interval> {
 
 export interface Chord<Position, Interval, Voicing> {
   readonly root: Pitch<Position>;
+  readonly bass?: Pitch<Position>;
   readonly definition: ChordDefinition<Interval>;
   readonly voicing: Voicing;
 }

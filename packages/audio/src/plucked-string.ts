@@ -1,25 +1,41 @@
 import type { AudioDriver, Voice } from './driver';
+import { synthesizeString } from './string-model';
 
-/** A shared harmonic excitation; each pluck owns its damping and amplitude envelope. */
+/** Buffers are synthesized locally; the bounded cache avoids repeated DSP during transcription. */
 export function createPluckedString(
   context: BaseAudioContext,
 ): AudioDriver['schedule'] {
-  const harmonics = 16;
-  const real = new Float32Array(harmonics + 1);
-  const imaginary = new Float32Array(harmonics + 1);
-  for (let harmonic = 1; harmonic <= harmonics; harmonic++) {
-    // A pluck away from the bridge softens the highest partials.
-    imaginary[harmonic] = Math.sin(harmonic * Math.PI * 0.22) / harmonic ** 1.5;
-  }
-  const wave = context.createPeriodicWave(real, imaginary);
-
+  const cache = new Map<string, { buffer: AudioBuffer; rate: number }>();
+  let cachedFrames = 0;
+  const frameBudget = 4_000_000;
   return (frequency, gain, start, end, onEnded): Voice => {
-    if (frequency >= context.sampleRate / 2)
-      throw new RangeError('Pitch exceeds the audio output range.');
-    const oscillator = context.createOscillator();
-    const damping = context.createBiquadFilter();
-    const envelope = context.createGain();
     const duration = end - start;
+    const seconds = Math.ceil(duration * 4) / 4;
+    const cacheKey = frequency + ':' + seconds;
+    let pluck = cache.get(cacheKey);
+    if (!pluck) {
+      const model = synthesizeString(frequency, context.sampleRate, seconds);
+      const buffer = context.createBuffer(
+        1,
+        model.samples.length,
+        context.sampleRate,
+      );
+      buffer.copyToChannel(model.samples, 0);
+      pluck = { buffer, rate: model.playbackRate };
+      while (cachedFrames + buffer.length > frameBudget && cache.size) {
+        const oldest = cache.entries().next().value;
+        if (!oldest) break;
+        cache.delete(oldest[0]);
+        cachedFrames -= oldest[1].buffer.length;
+      }
+      if (buffer.length <= frameBudget) {
+        cache.set(cacheKey, pluck);
+        cachedFrames += buffer.length;
+      }
+    }
+    const source = context.createBufferSource();
+    const body = context.createBiquadFilter();
+    const envelope = context.createGain();
     const attack = Math.min(0.005, duration / 4);
     const release = Math.min(0.1, duration / 4);
     let finished = false;
@@ -27,39 +43,29 @@ export function createPluckedString(
     const cleanup = () => {
       if (finished) return;
       finished = true;
-      oscillator.disconnect();
-      damping.disconnect();
+      source.disconnect();
+      body.disconnect();
       envelope.disconnect();
       onEnded();
     };
     try {
-      oscillator.setPeriodicWave(wave);
-      oscillator.frequency.setValueAtTime(frequency, start);
-      damping.type = 'lowpass';
-      damping.Q.value = 0.5;
-      const nyquist = context.sampleRate / 2;
-      damping.frequency.setValueAtTime(
-        Math.min(frequency * 10, nyquist),
-        start,
-      );
-      damping.frequency.exponentialRampToValueAtTime(
-        Math.min(frequency * 2, nyquist),
-        end - release,
-      );
+      source.buffer = pluck.buffer;
+      source.playbackRate.setValueAtTime(pluck.rate, start);
+      body.type = 'peaking';
+      body.frequency.value = 180;
+      body.Q.value = 0.7;
+      body.gain.value = 2;
       envelope.gain.setValueAtTime(0, start);
       envelope.gain.linearRampToValueAtTime(gain, start + attack);
-      envelope.gain.exponentialRampToValueAtTime(gain * 0.18, end - release);
+      envelope.gain.setValueAtTime(gain, end - release);
       envelope.gain.linearRampToValueAtTime(0, end);
-      oscillator
-        .connect(damping)
-        .connect(envelope)
-        .connect(context.destination);
-      oscillator.onended = cleanup;
-      oscillator.start(start);
-      oscillator.stop(end);
+      source.connect(body).connect(envelope).connect(context.destination);
+      source.onended = cleanup;
+      source.start(start);
+      source.stop(end);
     } catch (error) {
       try {
-        oscillator.stop();
+        source.stop();
       } catch {
         /* A source that never started needs no stop. */
       }
@@ -78,12 +84,12 @@ export function createPluckedString(
           envelope.gain.cancelAndHoldAtTime(at);
           envelope.gain.linearRampToValueAtTime(0, stopTime);
         }
-        oscillator.stop(stopTime);
+        source.stop(stopTime);
         return stopTime;
       },
       stop() {
         if (finished) return;
-        oscillator.stop();
+        source.stop();
         cleanup();
       },
     };
