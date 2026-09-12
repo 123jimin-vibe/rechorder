@@ -8,16 +8,20 @@
   },
   "scripts": {
     "dev": "pnpm --filter @rechorder/web dev",
-    "typecheck": "tsc --project tsconfig.tools.json && tsc --project tsconfig.browser-tests.json && pnpm --filter @rechorder/web typecheck",
+    "typecheck": "tsc --project tsconfig.tools.json && tsc --project tsconfig.browser-tests.json && tsc --project tsconfig.unit-tests.json && pnpm -r typecheck",
     "lint": "oxlint --deny-warnings",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "check": "pnpm format:check && pnpm lint && pnpm typecheck",
+    "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test",
     "build": "pnpm typecheck && pnpm --filter @rechorder/web build",
     "preview": "pnpm --filter @rechorder/web preview",
-    "test:browser": "playwright test"
+    "test:browser": "playwright test",
+    "test": "vitest run"
   },
   "devDependencies": {
+    "vitest": "4.1.11",
+    "@rechorder/music": "workspace:*",
+    "@rechorder/audio": "workspace:*",
     "@types/node": "24.13.4",
     "@playwright/test": "1.63.0",
     "@tsconfig/node24": "24.0.5",

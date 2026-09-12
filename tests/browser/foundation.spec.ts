@@ -1,8 +1,8 @@
 import { expect, test } from '@playwright/test';
 
-test('the built foundation loads an empty, styled page without errors', async ({
+test('home links to a reloadable static tool page without asset errors', async ({
   page,
-}, testInfo) => {
+}) => {
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
   page.on('console', (message) => {
@@ -16,23 +16,16 @@ test('the built foundation loads an empty, styled page without errors', async ({
 
   await page.goto('./');
   await expect(page).toHaveTitle('Rechorder');
-  await expect(page.getByRole('main')).toBeVisible();
-  await expect(page.getByRole('main')).toBeEmpty();
-  await expect(page.locator('body')).toHaveText('');
-  await expect(page.locator('html')).toHaveCSS(
-    'background-color',
-    'rgb(255, 255, 255)',
-  );
-
-  const layout = await page.evaluate(() => ({
-    contentWidth: document.documentElement.scrollWidth,
-    viewportWidth: window.innerWidth,
-  }));
-  expect(layout.contentWidth).toBeLessThanOrEqual(layout.viewportWidth);
-
-  // Direct reload must also resolve the deployed page and its hashed assets.
+  await page.getByRole('link', { name: 'Chord progression' }).click();
+  await expect(page).toHaveTitle('Chord progression · Rechorder');
+  await expect(
+    page.getByRole('heading', { name: 'Chord progression', exact: true }),
+  ).toBeVisible();
   await page.reload();
-  await expect(page.getByRole('main')).toBeVisible();
-  await page.screenshot({ path: testInfo.outputPath('foundation.png') });
+  await expect(
+    page.getByRole('button', { name: 'Insert chord' }),
+  ).toBeVisible();
+  await page.getByRole('link', { name: 'Rechorder', exact: true }).click();
+  await expect(page).toHaveTitle('Rechorder');
   expect(errors).toEqual([]);
 });

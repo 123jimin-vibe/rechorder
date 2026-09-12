@@ -5,10 +5,6 @@ title = "Musical Model"
 
 # Musical Model
 
-## Status — UNIMPLEMENTED
-
-This is the governing model for t0002; no implementation exists yet.
-
 ## Principles
 
 - Preserve musical meaning independently of tuning, frequency, UI, and audio.
@@ -22,6 +18,7 @@ This is the governing model for t0002; no implementation exists yet.
 - A progression entry has a stable ID. Identical chords remain distinct entries.
 - Editing operations are plain-data insert, remove, and move operations. Cursor/selection and playback state are outside the progression.
 - Resolve frequency only at the sound boundary. Validate external values there and at construction boundaries; use ArkType if a runtime schema is useful.
+- `@rechorder/music` owns generic pitch/interval/voicing types and a separate conventional adapter; it has no browser globals. See `docs/music-and-audio.md` for extension contracts.
 
 ## Initial values for t0002
 

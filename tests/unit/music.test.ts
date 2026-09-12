@@ -1,0 +1,103 @@
+import { describe, expect, it } from 'vitest';
+import {
+  chordDefinitions,
+  chordSymbol,
+  createChord,
+  resolvePitches,
+  standardTuning,
+  voiceChord,
+} from '@rechorder/music';
+import type { Pitch, Tuning } from '@rechorder/music';
+
+describe('conventional chord adapter', () => {
+  it.each([
+    ['major', ['C3', 'E3', 'G3']],
+    ['minor', ['C3', 'E♭3', 'G3']],
+    ['diminished', ['C3', 'E♭3', 'G♭3']],
+    ['augmented', ['C3', 'E3', 'G♯3']],
+    ['sus2', ['C3', 'D3', 'G3']],
+    ['sus4', ['C3', 'F3', 'G3']],
+    ['dominant7', ['C3', 'E3', 'G3', 'B♭3']],
+    ['major7', ['C3', 'E3', 'G3', 'B3']],
+    ['minor7', ['C3', 'E♭3', 'G3', 'B♭3']],
+  ])('spells %s in root position', (quality, labels) => {
+    expect(
+      voiceChord(createChord('C', quality)).map((pitch) => pitch.spelling),
+    ).toEqual(labels);
+  });
+
+  it('preserves enharmonic identity while resolving equal sounding pitches', () => {
+    const sharp = voiceChord(createChord('C♯', 'major'));
+    const flat = voiceChord(createChord('D♭', 'major'));
+    expect(sharp.map((pitch) => pitch.spelling)).toEqual(['C♯3', 'E♯3', 'G♯3']);
+    expect(flat.map((pitch) => pitch.spelling)).toEqual(['D♭3', 'F3', 'A♭3']);
+    expect(
+      resolvePitches(sharp, standardTuning).map((note) => note.frequency),
+    ).toEqual(
+      resolvePitches(flat, standardTuning).map((note) => note.frequency),
+    );
+  });
+
+  it('handles register crossings and double accidentals', () => {
+    expect(
+      voiceChord(createChord('B♯', 'major')).map((pitch) => pitch.spelling),
+    ).toEqual(['B♯3', 'D♯♯4', 'F♯♯4']);
+    expect(
+      voiceChord(createChord('B', 'minor7')).map((pitch) => pitch.spelling),
+    ).toEqual(['B3', 'D4', 'F♯4', 'A4']);
+    expect(chordSymbol(createChord('B♭', 'dominant7'))).toBe('B♭7');
+  });
+
+  it('uses the specified reference pitch and rejects unsupported catalogue input', () => {
+    expect(
+      standardTuning.frequency({ letter: 'A', accidental: 0, octave: 4 }),
+    ).toBe(440);
+    expect(() => createChord('H', 'major')).toThrow();
+    expect(() => createChord('C', 'unknown')).toThrow();
+    expect(chordDefinitions).toHaveLength(9);
+  });
+});
+
+describe('tuning-independent resolution', () => {
+  it('accepts a non-octave repeating coordinate system', () => {
+    const tuning: Tuning<number> = {
+      id: '13-divisions-of-3',
+      frequency: (step) => 100 * 3 ** (step / 13),
+    };
+    const pitches: readonly Pitch<number>[] = [
+      { position: 0, spelling: 'origin' },
+      { position: 13, spelling: 'next period' },
+    ];
+    expect(
+      resolvePitches(pitches, tuning).map((note) => note.frequency),
+    ).toEqual([100, 300]);
+  });
+
+  it('accepts unequal ratio-based pitches with no conventional notation', () => {
+    const tuning: Tuning<{ numerator: number; denominator: number }> = {
+      id: 'ratio-set',
+      frequency: ({ numerator, denominator }) =>
+        (200 * numerator) / denominator,
+    };
+    const notes = resolvePitches(
+      [
+        { position: { numerator: 1, denominator: 1 }, spelling: '1/1' },
+        { position: { numerator: 7, denominator: 4 }, spelling: '7/4' },
+      ],
+      tuning,
+    );
+    expect(notes.map((note) => note.frequency)).toEqual([200, 350]);
+  });
+
+  it.each([0, -1, NaN, Infinity])(
+    'rejects invalid frequency %s',
+    (frequency) => {
+      expect(() =>
+        resolvePitches([{ position: 0, spelling: 'test' }], {
+          id: 'invalid',
+          frequency: () => frequency,
+        }),
+      ).toThrow(RangeError);
+    },
+  );
+});

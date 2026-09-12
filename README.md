@@ -1,6 +1,7 @@
 # Rechorder
 
-A web music scratchpad. The current foundation intentionally renders a blank page.
+A web music scratchpad. Create a chord progression and audition individual chords
+at `/rechorder/chord-progression/`, linked from the home page.
 Requirements and task history live in `worklog/`; start with s0001 and s0002.
 
 ## Development
@@ -16,13 +17,14 @@ pnpm dev
 
 Open `http://127.0.0.1:5173/rechorder/`.
 
-| Command             | Purpose                                     |
-| ------------------- | ------------------------------------------- |
-| `pnpm check`        | Formatting, lint, and TypeScript checks     |
-| `pnpm format`       | Apply consistent formatting                 |
-| `pnpm build`        | Type-check, then build into `apps/web/dist` |
-| `pnpm preview`      | Serve that production build on port 4173    |
-| `pnpm test:browser` | Check the production build using Playwright |
+| Command             | Purpose                                      |
+| ------------------- | -------------------------------------------- |
+| `pnpm check`        | Formatting, lint, TypeScript, and unit tests |
+| `pnpm test`         | Musical, editing, and audio lifecycle tests  |
+| `pnpm format`       | Apply consistent formatting                  |
+| `pnpm build`        | Type-check, then build into `apps/web/dist`  |
+| `pnpm preview`      | Serve that production build on port 4173     |
+| `pnpm test:browser` | Check the production build using Playwright  |
 
 Install the recommended VS Code extensions for Oxlint, Prettier, and TypeScript's
 native language service. The project enables formatting and explicit lint fixes on save.
@@ -30,7 +32,8 @@ native language service. The project enables formatting and explicit lint fixes 
 ## Structure and boundaries
 
 - `apps/web`: HTML entry pages, Preact presentation, styles, and application composition.
-- `packages/*`: reserved workspace pattern for reusable modules with actual callers in t0002.
+- `packages/music`: musical models, conventional chord/voicing adapter, tuning, and immutable progression operations; no browser globals.
+- `packages/audio`: cancellable audio-clock scheduling, active-note reporting, and the native Web Audio instrument; no UI dependencies.
 - `tsconfig.base.json`: recommended strict rules with no ambient DOM or Node globals.
 - Separate web, build-tool, and browser-test configs add only their required environments.
 
@@ -38,7 +41,8 @@ Musical data/operations must remain independent of Preact, DOM, and browser audi
 objects. The application assembles sound implementations and owns their lifetime.
 Keep musical edits, UI selection, and transient playback state distinct. Future
 sequencing must not depend on rendering. Musical models must accommodate atypical
-temperaments and complex beats; t0002 will define their concrete representations.
+temperaments and complex beats. See [music and audio contracts](docs/music-and-audio.md)
+for current interfaces and the path to sequencing and additional musical systems.
 
 Use explicit package dependencies and public exports as packages are introduced.
 Review imports and ownership; no architecture-analysis framework is installed.
@@ -49,7 +53,7 @@ Preact keeps presentation small. Vite owns HTML/asset processing, static builds,
 and development serving; an esbuild-only setup would require custom orchestration.
 Preact uses Vite's native JSX transform without a framework plugin or Babel.
 TSX changes use normal reloads; state-preserving component refresh is not configured.
-Use CSS Modules when component styles arrive and native CSS features throughout.
+Use CSS Modules for component styles and native CSS features throughout.
 
 ## Pages and deployment
 
@@ -91,5 +95,6 @@ CI runs Chromium desktop/portrait checks against the built site. An unavailable
 browser installation is explicitly reported as a skip; actual test failures fail CI.
 Local runs also support Firefox desktop and WebKit portrait. Emulation does not
 replace human testing on iOS Safari, Android Chrome, and other target devices.
-Record tested versions and unavailable coverage in the task. Unit tests begin with
-real musical logic in t0002.
+Record tested versions and unavailable coverage in the task. Browser checks include
+editing, keyboard access, overflow, failures, and native audio waveform output.
+Waveform checks do not replace perceptual listening on physical devices.

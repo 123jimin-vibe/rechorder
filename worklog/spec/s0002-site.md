@@ -44,10 +44,10 @@ Site-wide requirements; product direction is in s0001.
 ## Verification
 
 - CI checks formatting, lint, types, and the production build using a frozen lockfile.
-- Check built assets, the blank surface, and application errors with Playwright where adequate browsers exist. Record browser unavailability as a skip, never a pass.
+- Check built assets, page interactions, and application errors with Playwright where adequate browsers exist. Record browser unavailability as a skip, never a pass.
 - Target current and previous major iOS Safari, Android Chrome, and desktop Chrome/Edge, Firefox, and Safari. Record actual tested versions; humans also test target devices.
-- Add focused Vitest tests as reusable logic arrives in t0002; no placeholder unit tests for the blank site.
+- Use focused Vitest tests for musical operations, editing boundaries, and playback lifecycle.
 
-## Next milestone — t0002, UNIMPLEMENTED
+## Chord progression utility — t0002
 
-Implement s0003 and s0004. The home page may gain a simple feature list; a decorated landing page and non-English support remain later work.
+The static `/chord-progression/` page implements s0003–s0005, linked from a plain home-page feature list. A decorated landing page and non-English support remain later work.

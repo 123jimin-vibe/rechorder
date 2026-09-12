@@ -1,0 +1,7 @@
+{
+  "extends": "./tsconfig.tools.json",
+  "compilerOptions": {
+    "lib": ["ES2023", "DOM"]
+  },
+  "include": ["vitest.config.ts", "tests/unit/**/*.ts"]
+}

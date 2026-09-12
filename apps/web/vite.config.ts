@@ -1,9 +1,20 @@
 import { defineConfig } from 'vite';
+import { fileURLToPath } from 'node:url';
 import { siteBase } from './site.config.ts';
 
 export default defineConfig({
   appType: 'mpa',
   base: siteBase,
+  build: {
+    rolldownOptions: {
+      input: {
+        home: fileURLToPath(new URL('./index.html', import.meta.url)),
+        chords: fileURLToPath(
+          new URL('./chord-progression/index.html', import.meta.url),
+        ),
+      },
+    },
+  },
   oxc: {
     jsx: {
       runtime: 'automatic',
