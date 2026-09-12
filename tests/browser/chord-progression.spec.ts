@@ -32,7 +32,7 @@ test('two direct choices audition a candidate without committing it', async ({
     page.getByRole('button', { name: 'Minor', exact: true }),
   ).toHaveAttribute('aria-pressed', 'true');
   await expect(
-    page.getByRole('button', { name: 'Replace selected chord', exact: true }),
+    page.getByRole('button', { name: 'Replace', exact: true }),
   ).toBeDisabled();
 });
 
@@ -42,11 +42,11 @@ test('append, load, replace, and backspace preserve musical values and identitie
   await page.goto('./chord-progression/');
   const cards = page.locator('[data-entry-id]');
   const append = page.getByRole('button', {
-    name: 'Append chord',
+    name: 'Append',
     exact: true,
   });
   const replace = page.getByRole('button', {
-    name: 'Replace selected chord',
+    name: 'Replace',
     exact: true,
   });
   const backspace = page.getByRole('button', {
@@ -54,7 +54,16 @@ test('append, load, replace, and backspace preserve musical values and identitie
     exact: true,
   });
   await expect(backspace).toBeDisabled();
+  const strip = page.getByRole('group', {
+    name: 'Chord progression',
+    exact: true,
+  });
+  const emptyHeight = (await strip.boundingBox())?.height;
   await append.click();
+  expect((await strip.boundingBox())?.height).toBe(emptyHeight);
+  await expect(cards.first()).toHaveText('C');
+  await expect(page.getByText('Find the chord. Keep the idea.')).toHaveCount(0);
+  await expect(page.getByText('Your progression starts here')).toHaveCount(0);
   await page.getByRole('button', { name: 'Root D', exact: true }).click();
   await page.getByRole('button', { name: 'Minor', exact: true }).click();
   await expect(cards.locator('strong')).toHaveText(['C']);
@@ -82,7 +91,7 @@ test('append, load, replace, and backspace preserve musical values and identitie
   await backspace.click();
   await expect(cards.locator('strong')).toHaveText(['G7', 'Dm']);
   await expect(cards.nth(0)).toHaveAttribute('aria-pressed', 'true');
-  await expect(replace).toHaveText('↔ Replace #1');
+  await expect(replace).toHaveText('Replace');
   await cards.nth(1).click();
   await backspace.click();
   await expect(replace).toBeDisabled();
@@ -92,12 +101,45 @@ test('append, load, replace, and backspace preserve musical values and identitie
   await expect(backspace).toBeDisabled();
 });
 
+test('root rows remain aligned and chord changes do not move the controls', async ({
+  page,
+}) => {
+  await page.goto('./chord-progression/');
+  const sharp = await page
+    .getByRole('button', { name: 'Root C♯', exact: true })
+    .boundingBox();
+  const natural = await page
+    .getByRole('button', { name: 'Root C', exact: true })
+    .boundingBox();
+  const flat = await page
+    .getByRole('button', { name: 'Root C♭', exact: true })
+    .boundingBox();
+  expect(sharp && natural && flat).toBeTruthy();
+  expect(sharp!.x).toBeCloseTo(natural!.x, 0);
+  expect(natural!.x).toBeCloseTo(flat!.x, 0);
+  expect(sharp!.y).toBeLessThan(natural!.y);
+  expect(natural!.y).toBeLessThan(flat!.y);
+  expect(sharp!.height).toBeGreaterThanOrEqual(44);
+
+  const root = page.getByRole('button', { name: 'Root C', exact: true });
+  const nowPlaying = page.getByRole('heading', { name: 'Now playing' });
+  const before = {
+    root: (await root.boundingBox())?.y,
+    playing: (await nowPlaying.boundingBox())?.y,
+  };
+  for (const type of ['Dominant seventh', 'Augmented', 'Major']) {
+    await page.getByRole('button', { name: type, exact: true }).click();
+    expect((await root.boundingBox())?.y).toBeCloseTo(before.root!, 0);
+    expect((await nowPlaying.boundingBox())?.y).toBeCloseTo(before.playing!, 0);
+  }
+});
+
 test('timeline and type choices immediately replace a sounding audition', async ({
   page,
 }) => {
   await page.addInitScript(installAudioProbe);
   await page.goto('./chord-progression/');
-  await page.getByRole('button', { name: 'Append chord', exact: true }).click();
+  await page.getByRole('button', { name: 'Append', exact: true }).click();
   const first = page.getByRole('button', {
     name: 'Select and play chord 1: C',
     exact: true,
@@ -142,7 +184,7 @@ test('compact long progressions scroll and controls remain keyboard operable', a
 }, testInfo) => {
   await page.goto('./chord-progression/');
   const append = page.getByRole('button', {
-    name: 'Append chord',
+    name: 'Append',
     exact: true,
   });
   for (let index = 0; index < 20; index++) await append.click();
@@ -165,6 +207,41 @@ test('compact long progressions scroll and controls remain keyboard operable', a
   const dimensions = await cards.nth(0).boundingBox();
   expect(dimensions?.width).toBeLessThanOrEqual(64);
   expect(dimensions?.height).toBeLessThanOrEqual(64);
+  const middle = cards.nth(10);
+  await middle.click();
+  await expect
+    .poll(async () =>
+      strip.evaluate((element) => {
+        const selected = element.querySelector('[aria-pressed="true"]');
+        if (!selected) return Infinity;
+        const stripBounds = element.getBoundingClientRect();
+        const selectedBounds = selected.getBoundingClientRect();
+        return Math.abs(
+          selectedBounds.left +
+            selectedBounds.width / 2 -
+            (stripBounds.left + stripBounds.width / 2),
+        );
+      }),
+    )
+    .toBeLessThan(2);
+  await strip.evaluate((element) => {
+    element.scrollLeft = 0;
+  });
+  await expect
+    .poll(() => strip.evaluate((element) => element.scrollLeft))
+    .toBe(0);
+  await middle.click();
+  await expect
+    .poll(async () =>
+      strip.evaluate((element) => {
+        const selected = element.querySelector('[aria-pressed="true"]');
+        if (!selected) return Infinity;
+        const a = element.getBoundingClientRect();
+        const b = selected.getBoundingClientRect();
+        return Math.abs(b.left + b.width / 2 - a.left - a.width / 2);
+      }),
+    )
+    .toBeLessThan(2);
   await cards.nth(0).focus();
   await page.keyboard.press('Space');
   await expect(cards.nth(0)).toHaveAttribute('aria-pressed', 'true');
@@ -230,16 +307,14 @@ test('removing or replacing a source cancels it; suspended audio resumes from a 
   await page.addInitScript(installAudioProbe);
   await page.goto('./chord-progression/');
   const append = page.getByRole('button', {
-    name: 'Append chord',
+    name: 'Append',
     exact: true,
   });
   const sounding = page.getByLabel('Currently playing notes');
   await append.click();
   await page.locator('[data-entry-id]').click();
   await expect(sounding).toHaveText('C3E3G3');
-  await page
-    .getByRole('button', { name: 'Replace selected chord', exact: true })
-    .click();
+  await page.getByRole('button', { name: 'Replace', exact: true }).click();
   await expect(sounding).toHaveText('No notes playing', { timeout: 750 });
   await page.locator('[data-entry-id]').click();
   await expect(sounding).toHaveText('C3E3G3');
@@ -283,11 +358,9 @@ test('audio failure is logged while append and replace remain usable', async ({
   await expect(page.getByLabel('Currently playing notes')).toHaveText(
     'No notes playing',
   );
-  await page.getByRole('button', { name: 'Append chord', exact: true }).click();
+  await page.getByRole('button', { name: 'Append', exact: true }).click();
   await page.getByRole('button', { name: 'Minor', exact: true }).click();
-  await page
-    .getByRole('button', { name: 'Replace selected chord', exact: true })
-    .click();
+  await page.getByRole('button', { name: 'Replace', exact: true }).click();
   await expect(page.locator('[data-entry-id] strong')).toHaveText(['Dm']);
 });
 
@@ -303,16 +376,22 @@ test('narrow portrait and zoom keep choices and commits within the page', async 
   await expect(page.getByLabel('Candidate chord')).toHaveText(
     'B♯maj7B♯3 · D♯♯4 · F♯♯4 · A♯♯4',
   );
-  await page.getByRole('button', { name: 'Append chord', exact: true }).click();
+  await page.getByRole('button', { name: 'Append', exact: true }).click();
   await page.evaluate(() => {
     document.documentElement.style.fontSize = '200%';
   });
+  const narrowRoots = await page
+    .getByRole('button', { name: 'Root C♯', exact: true })
+    .boundingBox();
+  const narrowNatural = await page
+    .getByRole('button', { name: 'Root C', exact: true })
+    .boundingBox();
+  expect(narrowRoots?.x).toBeCloseTo(narrowNatural!.x, 0);
+  expect(narrowRoots!.y).toBeLessThan(narrowNatural!.y);
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= window.innerWidth,
     ),
   ).toBe(true);
-  await page
-    .getByRole('button', { name: 'Replace selected chord', exact: true })
-    .click();
+  await page.getByRole('button', { name: 'Replace', exact: true }).click();
 });

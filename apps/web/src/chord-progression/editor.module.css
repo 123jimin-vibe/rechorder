@@ -1,10 +1,10 @@
 .shell {
   max-inline-size: 62rem;
   margin-inline: auto;
-  padding: clamp(0.75rem, 3vw, 2rem);
+  padding: clamp(0.5rem, 2.5vw, 1.25rem);
   display: flex;
   flex-direction: column;
-  gap: 1.25rem;
+  gap: 0.875rem;
 
   & h1,
   & h2,
@@ -26,7 +26,7 @@
     border: 0;
   }
   & legend {
-    margin-block-end: 0.625rem;
+    margin-block-end: 0.375rem;
     padding: 0;
     color: var(--muted);
   }
@@ -46,9 +46,11 @@
     cursor: default;
     opacity: 0.65;
   }
-  & button:not(:disabled):hover {
-    border-color: var(--accent);
-    background: var(--accent-soft);
+  @media (hover: hover) {
+    & button:not(:disabled):hover {
+      border-color: var(--accent);
+      background: var(--accent-soft);
+    }
   }
   & button[aria-pressed='true'] {
     background: var(--accent-soft);
@@ -77,14 +79,9 @@
     font-size: clamp(1.125rem, 4vw, 1.5rem);
     letter-spacing: -0.035em;
   }
-  & p {
-    flex-basis: 100%;
-    color: var(--muted);
-    font-size: 0.8125rem;
-  }
 }
 .timeline {
-  padding: 0.875rem;
+  padding: 0.5rem 0.625rem;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 1rem;
@@ -93,49 +90,43 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-block-end: 0.5rem;
-  & > span {
-    color: var(--muted);
-    font-size: 0.75rem;
-    font-variant-numeric: tabular-nums;
-  }
+  margin-block-end: 0.125rem;
 }
 .timelineRow {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
+  min-inline-size: 0;
 }
 .strip {
   display: flex;
   align-items: center;
-  gap: 0.375rem;
-  flex: 1;
+  gap: 0.125rem;
+  inline-size: 100%;
+  block-size: 3.25rem;
   overflow-x: auto;
-  padding: 0.25rem;
-  min-block-size: 4.25rem;
+  padding: 0.25rem 0;
   scrollbar-width: thin;
+  /* Let the first and last chords reach center without shrinking tap targets. */
+  &::before,
+  &::after {
+    content: '';
+    flex: 0 0 max(0px, calc(50% - 2rem - 0.125rem));
+  }
 }
 .shell .chord {
-  flex: 0 0 auto;
-  min-inline-size: 3.5rem;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 0.125rem;
-  padding: 0.375rem 0.625rem;
+  flex: 0 0 4rem;
+  inline-size: 4rem;
+  display: grid;
+  place-items: center;
+  padding: 0.25rem;
   & strong {
-    font-size: 1rem;
+    max-inline-size: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 0.875rem;
     white-space: nowrap;
   }
 }
-.ordinal {
-  color: var(--muted);
-  font-size: 0.625rem;
-  font-variant-numeric: tabular-nums;
-}
 .shell .backspace {
-  flex: 0 0 2.75rem;
+  inline-size: 2.75rem;
   display: grid;
   place-items: center;
 }
@@ -144,32 +135,36 @@
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 1rem;
-  padding: clamp(0.75rem, 2.5vw, 1.5rem);
+  padding: clamp(0.625rem, 2vw, 1rem);
   box-shadow: 0 5px 20px var(--shadow);
 }
 .candidateRow {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-  margin-block-end: 1.25rem;
+  gap: 0.5rem;
+  margin-block-end: 0.875rem;
 }
 .candidate {
-  display: flex;
+  display: grid;
   min-inline-size: 0;
-  overflow-wrap: anywhere;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 0.25rem 1rem;
+  gap: 0.125rem;
   & strong {
+    min-inline-size: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
     font-size: 2.125rem;
     line-height: 1.2;
     letter-spacing: -0.04em;
+    white-space: nowrap;
   }
   & > span {
+    min-inline-size: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
     color: var(--muted);
     font-size: 0.875rem;
+    white-space: nowrap;
   }
 }
 .shell .replay {
@@ -182,12 +177,12 @@
 }
 .choices {
   display: grid;
-  gap: 1.125rem;
+  gap: 0.875rem;
 }
 .roots {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 0.25rem;
+  gap: 0.125rem;
   & button {
     padding-inline: 0;
     font-weight: 600;
@@ -196,7 +191,7 @@
 .types {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.375rem;
+  gap: 0.25rem;
   & button {
     font-size: 0.875rem;
   }
@@ -209,8 +204,8 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.5rem;
-  margin-block-start: 1.25rem;
-  padding-block-start: 1rem;
+  margin-block-start: 0.875rem;
+  padding-block-start: 0.75rem;
   border-block-start: 1px solid var(--border);
   & button {
     font-size: 0.875rem;
@@ -221,22 +216,25 @@
   color: var(--on-accent);
   background: var(--accent);
   border-color: var(--accent);
-  &:not(:disabled):hover {
-    background: var(--accent-hover);
-    color: var(--on-accent);
+  @media (hover: hover) {
+    &:not(:disabled):hover {
+      background: var(--accent-hover);
+      color: var(--on-accent);
+    }
   }
 }
 .playingRow {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
-  flex-wrap: wrap;
-  gap: 0.5rem 1rem;
-  padding-inline: 0.25rem;
+  gap: 0.625rem;
+  min-block-size: 3rem;
   & h2 {
     color: var(--muted);
     display: flex;
     align-items: center;
     gap: 0.5rem;
+    white-space: nowrap;
   }
 }
 .indicator {
@@ -250,10 +248,13 @@
 }
 .playing {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
   gap: 0.375rem;
-  min-block-size: 2rem;
+  min-inline-size: 0;
+  min-block-size: 2.75rem;
+  overflow-x: auto;
+  scrollbar-width: none;
 }
 .empty {
   color: var(--muted);
@@ -272,15 +273,13 @@
     grid-template-columns: 1fr 1fr;
     gap: 1.75rem;
   }
-  .header {
-    margin-block-end: 0.5rem;
-  }
 }
 
 /* Reflow pads and commit labels when enlarged text leaves too little room. */
 @container (width < 12rem) {
   .roots {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(7, minmax(2.75rem, 1fr));
+    overflow-x: auto;
   }
   .types {
     grid-template-columns: repeat(2, minmax(0, 1fr));

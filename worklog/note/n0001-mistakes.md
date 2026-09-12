@@ -11,6 +11,10 @@ Similar mistakes from one session may be merged.
 
 Exclude self-corrected mistakes.
 
+### t0005: Compact, steady touch layout
+
+The user found that the t0004 UI still used redundant copy and ordinals, wasted space in the body/timeline, let the erase button crowd the strip, and shifted around changing chord symbols. The timeline also failed to center a tapped chord, and the accidental rows put flats above naturals. Check actual mobile geometry and interaction states; use self-explanatory controls and fixed layout slots before adding explanatory text.
+
 ### t0004: Optimize the actual transcription loop
 
 The user pointed out that bulky cards, cursor controls, dropdowns, and separate play actions obstructed s0001's quick transcription goal; the sound and styling also felt too bare. Optimize repeated choose/hear/commit actions first, with direct choices, compact playable entries, append/replace, and remove-last. A clearer cursor still adds unnecessary interaction when the workflow does not need one.

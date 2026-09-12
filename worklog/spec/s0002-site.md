@@ -27,6 +27,7 @@ Site-wide requirements; product direction is in s0001.
 ### Accessible, mobile-first presentation
 
 - Prioritize portrait layouts, semantic HTML, keyboard access, visible focus, and zoom.
+- Favor self-explanatory controls over help text. Use space economically while preserving touch targets and visual rhythm; ordinary editing and audition must not shift surrounding layout.
 - Use native modern CSS: nesting, variables, and logical properties; no SCSS.
 - Utility styling uses replaceable semantic palette tokens: warm neutral surfaces and teal accents initially. Keep selected states, readable contrast, and focus visible.
 - Separate display text from musical identifiers and reusable logic. Prepare for localization without implementing translations yet.

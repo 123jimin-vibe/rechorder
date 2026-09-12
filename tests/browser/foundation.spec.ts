@@ -22,9 +22,7 @@ test('home links to a reloadable static tool page without asset errors', async (
     page.getByRole('heading', { name: 'Chord progression', exact: true }),
   ).toBeVisible();
   await page.reload();
-  await expect(
-    page.getByRole('button', { name: 'Append chord' }),
-  ).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Append' })).toBeVisible();
   await page.getByRole('link', { name: 'Rechorder', exact: true }).click();
   await expect(page).toHaveTitle('Rechorder');
   expect(errors).toEqual([]);

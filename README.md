@@ -4,9 +4,9 @@ A web music scratchpad. Create a chord progression and audition individual chord
 at `/rechorder/chord-progression/`, linked from the home page.
 Requirements and task history live in `worklog/`; start with s0001 and s0002.
 
-Tap a root and chord type to audition, then append or replace the selected chord.
-Timeline chords load and play with one tap; the backspace button removes the last
-chord. Audio uses a plucked-string synth. The initial warm-neutral/teal palette is
+Tap a root and chord type to audition, then Append or Replace. Timeline chords
+load and play with one tap; the backspace icon removes the last chord. Audio uses
+a plucked-string synth. The initial warm-neutral/teal palette is
 defined by semantic CSS variables in `apps/web/src/styles.css`.
 
 ## Development

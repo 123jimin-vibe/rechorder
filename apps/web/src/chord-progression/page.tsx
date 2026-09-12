@@ -14,8 +14,8 @@ import type { AuditionController } from './audition';
 import { editorReducer, initialEditor } from './editor';
 import styles from './editor.module.css';
 
-// Natural, flat, and sharp rows keep every spelling a single tap away.
-const rootPads = [0, -1, 1].flatMap((accidental) =>
+// Align each root's sharp, natural, and flat spelling in one column.
+const rootPads = [1, 0, -1].flatMap((accidental) =>
   roots.filter((root) => root.pitch.position.accidental === accidental),
 );
 
@@ -51,6 +51,7 @@ export function EditorPage({
   const [state, dispatch] = useReducer(editorReducer, initialEditor);
   const [candidate, setCandidate] = useState(() => createChord('C', 'major'));
   const selectedRef = useRef<HTMLButtonElement>(null);
+  const stripRef = useRef<HTMLFieldSetElement>(null);
   const candidateNotes = useMemo(() => voiceChord(candidate), [candidate]);
   const rootId = roots.find(
     ({ pitch }) =>
@@ -64,17 +65,27 @@ export function EditorPage({
       sounding.map(({ note }) => [note.label + ':' + note.frequency, note]),
     ).values(),
   ];
-  const selectedIndex = state.entries.findIndex(
-    (entry) => entry.id === state.selectedId,
-  );
-  const selected = state.entries[selectedIndex];
+  const selected = state.entries.find((entry) => entry.id === state.selectedId);
 
   useEffect(() => {
     selectedRef.current?.scrollIntoView({
       block: 'nearest',
       inline: 'nearest',
     });
-  }, [state.selectedId]);
+  }, [state.entries.length]);
+
+  function centerTimelineItem(element: HTMLButtonElement) {
+    const strip = stripRef.current;
+    if (!strip) return;
+    const itemBounds = element.getBoundingClientRect();
+    const stripBounds = strip.getBoundingClientRect();
+    const left =
+      strip.scrollLeft +
+      itemBounds.left -
+      stripBounds.left +
+      (itemBounds.width - stripBounds.width) / 2;
+    strip.scrollTo({ left, behavior: 'smooth' });
+  }
 
   function play(chord: WesternChord, source: string) {
     try {
@@ -99,47 +110,15 @@ export function EditorPage({
           Rechorder<span aria-hidden="true"> / </span>
         </a>
         <h1>Chord progression</h1>
-        <p>Find the chord. Keep the idea.</p>
       </header>
 
       <section class={styles['timeline']} aria-labelledby="progression-heading">
         <div class={styles['sectionHeading']}>
           <h2 id="progression-heading">Progression</h2>
-          <span>
-            {state.entries.length}{' '}
-            {state.entries.length === 1 ? 'chord' : 'chords'}
-          </span>
-        </div>
-        <div class={styles['timelineRow']}>
-          <fieldset class={styles['strip']} aria-label="Chord progression">
-            {state.entries.map((entry, index) => (
-              <button
-                key={entry.id}
-                type="button"
-                class={styles['chord']}
-                data-entry-id={entry.id}
-                aria-label={`Select and play chord ${index + 1}: ${chordSymbol(entry.value)}`}
-                aria-pressed={state.selectedId === entry.id}
-                ref={state.selectedId === entry.id ? selectedRef : null}
-                onClick={() => {
-                  dispatch({ type: 'select', id: entry.id });
-                  setCandidate(entry.value);
-                  play(entry.value, entry.id);
-                }}
-              >
-                <span class={styles['ordinal']}>{index + 1}</span>
-                <strong>{chordSymbol(entry.value)}</strong>
-              </button>
-            ))}
-            {state.entries.length === 0 && (
-              <span class={styles['empty']}>Your progression starts here</span>
-            )}
-          </fieldset>
           <button
             type="button"
             class={styles['backspace']}
             aria-label="Remove last chord"
-            title="Remove last chord"
             disabled={state.entries.length === 0}
             onClick={() => {
               const last = state.entries.at(-1);
@@ -165,6 +144,33 @@ export function EditorPage({
             </svg>
           </button>
         </div>
+        <div class={styles['timelineRow']}>
+          <fieldset
+            class={styles['strip']}
+            aria-label="Chord progression"
+            ref={stripRef}
+          >
+            {state.entries.map((entry, index) => (
+              <button
+                key={entry.id}
+                type="button"
+                class={styles['chord']}
+                data-entry-id={entry.id}
+                aria-label={`Select and play chord ${index + 1}: ${chordSymbol(entry.value)}`}
+                aria-pressed={state.selectedId === entry.id}
+                ref={state.selectedId === entry.id ? selectedRef : null}
+                onClick={(event) => {
+                  centerTimelineItem(event.currentTarget);
+                  dispatch({ type: 'select', id: entry.id });
+                  setCandidate(entry.value);
+                  play(entry.value, entry.id);
+                }}
+              >
+                <strong>{chordSymbol(entry.value)}</strong>
+              </button>
+            ))}
+          </fieldset>
+        </div>
       </section>
 
       <section class={styles['composer']} aria-label="Chord builder">
@@ -179,7 +185,6 @@ export function EditorPage({
             type="button"
             class={styles['replay']}
             aria-label="Play candidate"
-            title="Play candidate"
             onClick={() => play(candidate, 'candidate')}
           >
             <svg
@@ -244,7 +249,7 @@ export function EditorPage({
           <button
             type="button"
             class={styles['primary']}
-            aria-label="Append chord"
+            aria-label="Append"
             onClick={() =>
               dispatch({
                 type: 'append',
@@ -252,12 +257,12 @@ export function EditorPage({
               })
             }
           >
-            <span aria-hidden="true">＋</span> Append chord
+            <span aria-hidden="true">＋</span> Append
           </button>
           <button
             type="button"
             disabled={!selected}
-            aria-label="Replace selected chord"
+            aria-label="Replace"
             onClick={() => {
               if (selected) {
                 controller.stopSource(selected.id);
@@ -265,8 +270,7 @@ export function EditorPage({
               }
             }}
           >
-            <span aria-hidden="true">↔</span>{' '}
-            {selected ? `Replace #${selectedIndex + 1}` : 'Replace selected'}
+            Replace
           </button>
         </div>
       </section>
