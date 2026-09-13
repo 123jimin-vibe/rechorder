@@ -1,6 +1,7 @@
-/// <reference path="./assets.d.ts" />
 import type { AudioDriver } from './driver';
 import { createBowedString } from './bowed-string';
+// Vite `?worker&url` virtual module; oxlint resolves the query-less source file, which has no default export.
+// oxlint-disable-next-line import/default
 import processorUrl from './bowed-processor.ts?worker&url';
 
 export function createWebAudioDriver(): AudioDriver {
