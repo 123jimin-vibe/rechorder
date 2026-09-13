@@ -11,6 +11,10 @@ Similar mistakes from one session may be merged.
 
 Exclude self-corrected mistakes.
 
+### t0009: Brassy polyphony from the bowed approximation
+
+The user reports brass-like sound when several notes play together. The t0007 harmonic approximation and signal-level tests did not establish bowed-string realism. Research excitation, body response and interactions between voices; use chord listening comparisons as acceptance evidence instead of treating pitch, sustain and loudness checks as proof of timbre.
+
 ### t0008: Group controls by musical role
 
 The user corrected the visual hierarchy: Bass belongs with Root, and Jazz & extensions belongs under Chord type. Preserve these relationships in the document structure so desktop columns and mobile stacking communicate the same grouping.
