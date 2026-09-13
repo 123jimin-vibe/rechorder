@@ -13,7 +13,9 @@
 | `@rechorder/music`                           | Plain musical data, voicing/tuning resolution, immutable insert/replace/remove/move |
 | `@rechorder/audio`                           | Audio-clock scheduling, cancellation, sounding-note snapshots, voice cleanup        |
 | `apps/web/src/chord-progression/editor.ts`   | Pure editor reducer; append, replace selected, remove last, stable selection        |
-| `apps/web/src/chord-progression/audition.ts` | Latest-request policy, one audition with release tails, console error reporting     |
+| `apps/web/src/audio/audition.ts`             | Latest-request policy, one audition with release tails, console error reporting     |
+| `apps/web/src/components/piano-keyboard.tsx` | Shared playable conventional keyboard; each instance owns its scroll viewport       |
+| `apps/web/src/components/rotatable-view.tsx` | Reusable 90-degree utility viewport and toggle                                      |
 | `apps/web/src/chord-progression/main.tsx`    | Service composition, page visibility and disposal                                   |
 | `apps/web/src/chord-progression/page.tsx`    | Candidate controls, rendering, and user actions                                     |
 
@@ -65,7 +67,7 @@ scheduled, suspended, and finished voices are silent in this snapshot. The UI po
 it with animation frames only for display. Sources and envelopes use the audio clock.
 `stopAll()` stops immediately; `dispose()` also closes the context and is idempotent.
 
-The page requests a one-second bowed-string audition (65 ms attack and 100 ms release
+The chord page requests a one-second bowed-string audition (65 ms attack and 100 ms release
 included). `string-model.ts` synthesizes band-limited stick/slip-style harmonics shaped
 by body formants, subtle vibrato and bow noise. Excitation sustains throughout the note;
 a normalized source and square-root voice-count gain preserve audible chord energy.
@@ -84,8 +86,10 @@ Keyboard presses use independent handles at one-quarter level, up to ten held ge
 They can sound alongside the chord audition, sustain for up to four seconds, and release
 on pointer/key up, cancellation, lost capture or keyboard blur. Pending gestures are
 identity-checked after audio resume so a released finger cannot produce a late note.
-The keyboard uses pointer capture, horizontal touch panning, octave shortcuts and
-Space/Enter support; screen readers retain spelled-note announcements.
+The keyboard uses pointer capture, horizontal touch panning, optional octave shortcuts and
+Space/Enter support; screen readers retain spelled-note announcements. The free Piano page
+mounts two instances with separate scroll positions and input source IDs. It uses the
+current bowed-string instrument, while the rotatable viewport only changes presentation.
 
 ## Near-term extensions
 

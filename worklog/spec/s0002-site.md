@@ -41,6 +41,7 @@ Site-wide requirements; product direction is in s0001.
 - Use Oxlint and Prettier without complicating the stack for TS7 compatibility. Provide editor integration.
 - Pin tool versions and direct dependencies, commit one lockfile, and support Windows-compatible install, development, check, build, and preview commands.
 - Use static HTML entry pages for separate utilities, with a centralized hosting base path.
+- Utilities that need a landscape-sized playing surface may rotate their own viewport by 90 degrees without requiring device rotation. Keep that view container reusable across utilities.
 - Publish GitHub Pages artifacts through Actions after checks pass on `main`, with a manual trigger. Default to `/rechorder/`; permit an explicit build base for other hosting paths.
 
 ## Verification
@@ -53,3 +54,7 @@ Site-wide requirements; product direction is in s0001.
 ## Chord progression utility — t0002
 
 The static `/chord-progression/` page implements s0003–s0005, linked from a plain home-page feature list. A decorated landing page and non-English support remain later work.
+
+## Piano utility — t0010
+
+The static `/piano/` page implements s0006 and follows the chord progression link on the home-page feature list.

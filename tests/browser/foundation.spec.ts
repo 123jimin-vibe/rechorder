@@ -25,5 +25,11 @@ test('home links to a reloadable static tool page without asset errors', async (
   await expect(page.getByRole('button', { name: 'Append' })).toBeVisible();
   await page.getByRole('link', { name: 'Rechorder', exact: true }).click();
   await expect(page).toHaveTitle('Rechorder');
+  await page.getByRole('link', { name: 'Piano', exact: true }).click();
+  await expect(page).toHaveTitle('Piano · Rechorder');
+  await page.reload();
+  await expect(
+    page.getByRole('button', { name: 'Rotate view 90 degrees' }),
+  ).toBeVisible();
   expect(errors).toEqual([]);
 });

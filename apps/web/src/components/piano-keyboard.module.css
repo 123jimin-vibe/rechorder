@@ -1,6 +1,12 @@
 .piano {
   min-inline-size: 0;
 }
+.fill {
+  display: flex;
+  flex-direction: column;
+  min-block-size: 0;
+  block-size: 100%;
+}
 .octaves {
   display: flex;
   flex-wrap: wrap;
@@ -23,11 +29,18 @@
   padding-block: 0.25rem 0.5rem;
   scrollbar-width: thin;
 }
+.fill .viewport {
+  flex: 1 1 auto;
+  min-block-size: 0;
+}
 .keys {
   display: flex;
   position: relative;
   inline-size: max-content;
   padding: 2px;
+}
+.fill .keys {
+  block-size: 100%;
 }
 .keys button {
   touch-action: pan-x;
@@ -47,6 +60,9 @@
   color: var(--text);
   box-shadow: inset 0 -3px 0 var(--border);
 }
+.fill .keys .white {
+  block-size: 100%;
+}
 .keys .black {
   z-index: 1;
   flex: 0 0 2rem;
@@ -57,6 +73,9 @@
   color: var(--surface);
   border-color: var(--text);
   font-size: 0.6875rem;
+}
+.fill .keys .black {
+  block-size: 62%;
 }
 .keys button[aria-pressed='true'] {
   background: var(--accent);

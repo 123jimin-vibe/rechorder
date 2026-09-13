@@ -10,6 +10,9 @@ export function App() {
             Chord progression
           </a>
         </li>
+        <li>
+          <a href={`${import.meta.env.BASE_URL}piano/`}>Piano</a>
+        </li>
       </ul>
     </main>
   );

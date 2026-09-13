@@ -12,6 +12,7 @@ export default defineConfig({
         chords: fileURLToPath(
           new URL('./chord-progression/index.html', import.meta.url),
         ),
+        piano: fileURLToPath(new URL('./piano/index.html', import.meta.url)),
       },
     },
   },

@@ -1,5 +1,4 @@
 import {
-  useEffect,
   useLayoutEffect,
   useMemo,
   useReducer,
@@ -16,37 +15,13 @@ import {
   voiceChord,
 } from '@rechorder/music';
 import type { WesternChord } from '@rechorder/music';
-import type { ActiveNote } from '@rechorder/audio';
-import type { AuditionController } from './audition';
+import type { AuditionController } from '../audio/audition';
+import { useSoundingNotes } from '../audio/use-sounding-notes';
 import { editorReducer, initialEditor } from './editor';
 import { BassOptions, JazzOptions, rootPads } from './chord-options';
 import { MusicalText } from './musical-text';
-import { Piano } from './piano';
+import { PianoKeyboard } from '../components/piano-keyboard';
 import styles from './editor.module.css';
-
-function useSoundingNotes(
-  controller: AuditionController,
-): readonly ActiveNote[] {
-  const [notes, setNotes] = useState<readonly ActiveNote[]>([]);
-  useEffect(() => {
-    let frame = 0;
-    let signature = '';
-    const update = () => {
-      const current = controller.notes();
-      const next = current
-        .map((item) => item.playbackId + ':' + item.note.key)
-        .join('|');
-      if (next !== signature) {
-        signature = next;
-        setNotes(current);
-      }
-      frame = requestAnimationFrame(update);
-    };
-    frame = requestAnimationFrame(update);
-    return () => cancelAnimationFrame(frame);
-  }, [controller]);
-  return notes;
-}
 
 export function EditorPage({
   controller,
@@ -115,7 +90,7 @@ export function EditorPage({
           />
           Now playing
         </h2>
-        <Piano controller={controller} notes={uniqueNotes} />
+        <PianoKeyboard controller={controller} notes={uniqueNotes} />
       </section>
 
       <section class={styles['timeline']} aria-labelledby="progression-heading">

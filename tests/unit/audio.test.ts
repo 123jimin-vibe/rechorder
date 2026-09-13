@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createPlaybackEngine } from '@rechorder/audio';
-import { AuditionController } from '../../apps/web/src/chord-progression/audition';
+import { AuditionController } from '../../apps/web/src/audio/audition';
 import { deferred, FakeDriver } from './fake-audio';
 
 const notes = [

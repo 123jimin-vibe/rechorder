@@ -1,7 +1,7 @@
 import { render } from 'preact';
 import { createPlaybackEngine } from '@rechorder/audio';
 import { AuditionController } from '../audio/audition';
-import { EditorPage } from './page';
+import { PianoPage } from './page';
 import '../styles.css';
 
 const root = document.getElementById('app');
@@ -17,7 +17,7 @@ const onPageHide = (event: PageTransitionEvent) => {
 };
 document.addEventListener('visibilitychange', onVisibility);
 window.addEventListener('pagehide', onPageHide);
-render(<EditorPage controller={controller} />, root);
+render(<PianoPage controller={controller} />, root);
 
 if (import.meta.hot) {
   import.meta.hot.dispose(() => {

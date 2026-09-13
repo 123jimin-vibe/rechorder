@@ -1,0 +1,38 @@
+.view {
+  position: relative;
+  inline-size: 100%;
+  block-size: 100dvh;
+  min-block-size: 0;
+  overflow: hidden;
+  background: var(--canvas);
+}
+.view[data-rotated='true'] {
+  position: fixed;
+  inset-block-start: 0;
+  inset-inline-start: 100vw;
+  z-index: 10;
+  inline-size: 100dvh;
+  block-size: 100dvw;
+  transform-origin: top left;
+  transform: rotate(90deg);
+}
+.rotate {
+  position: absolute;
+  z-index: 2;
+  inset-block-start: 0.5rem;
+  inset-inline-end: 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  min-block-size: 2.75rem;
+  padding: 0.4rem 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: 0.625rem;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+}
+.rotate:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
