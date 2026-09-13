@@ -11,6 +11,10 @@ Similar mistakes from one session may be merged.
 
 Exclude self-corrected mistakes.
 
+### Lint fix broke root typecheck
+
+Removing the `assets.d.ts` triple-slash reference from `web-audio.ts` to satisfy oxlint passed the package's own `tsc` but broke the root `tsconfig.unit-tests.json` project, which reaches the file transitively without that declaration. Run the full `pnpm typecheck` (every project), not one package, before treating a lint fix as verified; configure the rule when the flagged construct is the correct TypeScript mechanism.
+
 ### t0010: Rotation and independent piano gestures
 
 The user found that rotation only toggled two orientations, the rotate icon was malformed, rotated scrolling failed, and holding a note prevented scrolling the other row. The shared keyboard also inherited editor-only styling, and unnecessary Upper/Lower labels were added. Test actual swipes in all four orientations, including one held finger with another row scrolling; assigning scrollLeft is not evidence of working gestures. Keep shared component styles self-contained and omit redundant visible labels.

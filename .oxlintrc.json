@@ -6,6 +6,7 @@
   },
   "rules": {
     "typescript/no-explicit-any": "error",
+    "typescript/triple-slash-reference": ["error", { "path": "always" }],
     "typescript/ban-ts-comment": "error",
     "react/rules-of-hooks": "error",
     "react/jsx-key": "error"
