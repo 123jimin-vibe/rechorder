@@ -34,7 +34,7 @@ const violin = [
   [1, -1.9537, 0.9542, -1.6357, 0.8697],
   [1, -1.6683, 0.8852, -1.7674, 0.8735],
   [1, -1.8585, 0.9653, -1.8498, 0.9516],
-  [1, -1.9299, 0.9621, -1.9354, 0.9590],
+  [1, -1.9299, 0.9621, -1.9354, 0.959],
   [1, -1.98, 0.9888, -1.9867, 0.9923],
 ] as const;
 
@@ -54,18 +54,33 @@ export class StringBody {
     this.coefficients = new Float64Array(30);
     for (let index = 0; index < violin.length; index++) {
       const [b0, b1, b2, a1, a2] = violin[index]!;
-      const b = transform(b0, b1, b2), d = transform(1, a1, a2);
-      this.coefficients.set([b[0]! / d[0]!, b[1]! / d[0]!, b[2]! / d[0]!, d[1]! / d[0]!, d[2]! / d[0]!], index * 5);
+      const b = transform(b0, b1, b2),
+        d = transform(1, a1, a2);
+      this.coefficients.set(
+        [
+          b[0]! / d[0]!,
+          b[1]! / d[0]!,
+          b[2]! / d[0]!,
+          d[1]! / d[0]!,
+          d[2]! / d[0]!,
+        ],
+        index * 5,
+      );
     }
   }
 
   tick(input: number): number {
     let value = input * 0.1248;
     for (let index = 0; index < 6; index++) {
-      const c = index * 5, s = index * 2;
+      const c = index * 5,
+        s = index * 2;
       const output = this.coefficients[c]! * value + this.state[s]!;
-      this.state[s] = this.coefficients[c + 1]! * value - this.coefficients[c + 3]! * output + this.state[s + 1]!;
-      this.state[s + 1] = this.coefficients[c + 2]! * value - this.coefficients[c + 4]! * output;
+      this.state[s] =
+        this.coefficients[c + 1]! * value -
+        this.coefficients[c + 3]! * output +
+        this.state[s + 1]!;
+      this.state[s + 1] =
+        this.coefficients[c + 2]! * value - this.coefficients[c + 4]! * output;
       value = output;
     }
     return value;

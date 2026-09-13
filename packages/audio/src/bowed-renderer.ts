@@ -25,7 +25,9 @@ export class BowedRenderer {
     this.limiter = new PeakLimiter(sampleRate);
   }
 
-  get voiceCount(): number { return this.voices.size; }
+  get voiceCount(): number {
+    return this.voices.size;
+  }
 
   event(event: BowedEvent): void {
     if (event.type === 'dispose') {
@@ -34,15 +36,27 @@ export class BowedRenderer {
       return;
     }
     if (event.type === 'start') {
-      if (this.voices.size >= maximumVoices) throw new RangeError('Bowed voice limit reached.');
-      const start = Math.round(event.start * this.rate), end = Math.round(event.end * this.rate);
-      if (!Number.isSafeInteger(start) || !Number.isSafeInteger(end) || end <= start ||
-          !Number.isFinite(event.gain) || event.gain < 0 || event.gain > 1)
+      if (this.voices.size >= maximumVoices)
+        throw new RangeError('Bowed voice limit reached.');
+      const start = Math.round(event.start * this.rate),
+        end = Math.round(event.end * this.rate);
+      if (
+        !Number.isSafeInteger(start) ||
+        !Number.isSafeInteger(end) ||
+        end <= start ||
+        !Number.isFinite(event.gain) ||
+        event.gain < 0 ||
+        event.gain > 1
+      )
         throw new RangeError('Invalid bowed voice schedule.');
       this.voices.set(event.id, {
-        model: new BowedString(event.frequency, this.rate, event.seed), gain: event.gain,
-        start, end, attack: Math.min(this.rate * 0.065, (end - start) / 4),
-        release: end - Math.min(this.rate * 0.1, (end - start) / 4), releaseLevel: 1,
+        model: new BowedString(event.frequency, this.rate, event.seed),
+        gain: event.gain,
+        start,
+        end,
+        attack: Math.min(this.rate * 0.065, (end - start) / 4),
+        release: end - Math.min(this.rate * 0.1, (end - start) / 4),
+        releaseLevel: 1,
       });
       return;
     }
@@ -69,7 +83,10 @@ export class BowedRenderer {
   private envelope(voice: RenderVoice, frame: number): number {
     if (frame < voice.start || frame >= voice.end) return 0;
     if (frame >= voice.release)
-      return voice.releaseLevel * (voice.end - frame) / Math.max(1, voice.end - voice.release);
+      return (
+        (voice.releaseLevel * (voice.end - frame)) /
+        Math.max(1, voice.end - voice.release)
+      );
     return Math.min(1, (frame - voice.start) / voice.attack);
   }
 
@@ -82,14 +99,19 @@ export class BowedRenderer {
         const frame = firstFrame + index;
         const level = this.envelope(voice, frame);
         // Lift the bow on release while the string/body continue ringing.
-        const contact = frame < voice.release ? 1 : Math.max(0, 1 - (frame - voice.release) / (this.rate * 0.02));
-        output[index] = output[index]! + voice.model.tick(contact) * voice.gain * level;
+        const contact =
+          frame < voice.release
+            ? 1
+            : Math.max(0, 1 - (frame - voice.release) / (this.rate * 0.02));
+        output[index] =
+          output[index]! + voice.model.tick(contact) * voice.gain * level;
       }
       if (firstFrame + output.length >= voice.end + this.limiter.latency) {
         this.voices.delete(id);
         this.ended(id);
       }
     }
-    for (let index = 0; index < output.length; index++) output[index] = this.limiter.tick(output[index]!);
+    for (let index = 0; index < output.length; index++)
+      output[index] = this.limiter.tick(output[index]!);
   }
 }

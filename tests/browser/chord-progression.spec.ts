@@ -450,7 +450,9 @@ test('native bowed sources play together and reach silence', async ({
   expect(onset.worklets).toBe(1);
   expect(new Set(onset.voices.map((voice) => voice.start)).size).toBe(1);
   expect(onset.voices.map((voice) => voice.frequency)).toEqual([
-    expect.closeTo(261.6256, 3), expect.closeTo(329.6276, 3), expect.closeTo(391.9954, 3),
+    expect.closeTo(261.6256, 3),
+    expect.closeTo(329.6276, 3),
+    expect.closeTo(391.9954, 3),
   ]);
   await expect(page.getByLabel('Currently playing notes')).toHaveText(
     'No notes playing',

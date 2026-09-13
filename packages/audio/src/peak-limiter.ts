@@ -23,7 +23,10 @@ export class PeakLimiter {
 
   tick(input: number): number {
     const size = this.peaks.length;
-    while (this.head !== this.tail && this.frames[this.head]! < this.frame - this.latency)
+    while (
+      this.head !== this.tail &&
+      this.frames[this.head]! < this.frame - this.latency
+    )
       this.head = (this.head + 1) % size;
     const peak = Math.abs(input);
     while (this.head !== this.tail) {

@@ -60,7 +60,11 @@ export function installAudioProbe(): void {
     }
   };
   window.AudioWorkletNode = class extends AudioWorkletNode {
-    constructor(context: BaseAudioContext, name: string, options?: AudioWorkletNodeOptions) {
+    constructor(
+      context: BaseAudioContext,
+      name: string,
+      options?: AudioWorkletNodeOptions,
+    ) {
       super(context, name, options);
       worklets.push(this);
       const analyser = context.createAnalyser();
@@ -72,11 +76,23 @@ export function installAudioProbe(): void {
       // Observe actual voice events sent to the native renderer, without replacing DSP.
       const postMessage = this.port.postMessage.bind(this.port);
       this.port.postMessage = (message: unknown) => {
-        if (typeof message === 'object' && message !== null && 'type' in message && message.type === 'start' &&
-            'frequency' in message && typeof message.frequency === 'number' &&
-            'start' in message && typeof message.start === 'number' &&
-            'end' in message && typeof message.end === 'number') {
-          sources.push({ frequency: message.frequency, start: message.start, end: message.end });
+        if (
+          typeof message === 'object' &&
+          message !== null &&
+          'type' in message &&
+          message.type === 'start' &&
+          'frequency' in message &&
+          typeof message.frequency === 'number' &&
+          'start' in message &&
+          typeof message.start === 'number' &&
+          'end' in message &&
+          typeof message.end === 'number'
+        ) {
+          sources.push({
+            frequency: message.frequency,
+            start: message.start,
+            end: message.end,
+          });
           starts.push(context.currentTime);
         }
         postMessage(message);

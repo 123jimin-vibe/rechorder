@@ -12,17 +12,23 @@ export function createWebAudioDriver(): AudioDriver {
       return context.currentTime;
     },
     get running() {
-      return context.state === 'running' && Boolean(instrument) && !instrument!.failed;
+      return (
+        context.state === 'running' &&
+        Boolean(instrument) &&
+        !instrument!.failed
+      );
     },
     async resume() {
       if (context.state === 'closed')
         throw new Error('Audio context is closed.');
       // Call resume during the gesture, before awaiting the module fetch.
       const resume = context.resume();
-      module ??= context.audioWorklet.addModule(processorUrl).catch((error: unknown) => {
-        module = undefined;
-        throw error;
-      });
+      module ??= context.audioWorklet
+        .addModule(processorUrl)
+        .catch((error: unknown) => {
+          module = undefined;
+          throw error;
+        });
       await Promise.all([resume, module]);
       if (context.state !== 'running')
         throw new Error('Audio context could not start.');
@@ -32,7 +38,8 @@ export function createWebAudioDriver(): AudioDriver {
       }
     },
     schedule(...args) {
-      if (!instrument) throw new Error('Audio must be initialized before scheduling.');
+      if (!instrument)
+        throw new Error('Audio must be initialized before scheduling.');
       return instrument.schedule(...args);
     },
     async close() {

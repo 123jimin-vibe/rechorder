@@ -1,10 +1,17 @@
 import type { AudioDriver, Voice } from './driver';
-import { maximumVoices, validateString, type BowedEvent, type BowedReply } from './bowed-protocol';
+import {
+  maximumVoices,
+  validateString,
+  type BowedEvent,
+  type BowedReply,
+} from './bowed-protocol';
 
 /** Main-thread resource/lifecycle adapter. All sample generation runs in the worklet. */
 export function createBowedString(context: BaseAudioContext) {
   const node = new AudioWorkletNode(context, 'rechorder-bowed-strings', {
-    numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [1],
+    numberOfInputs: 0,
+    numberOfOutputs: 1,
+    outputChannelCount: [1],
   });
   node.connect(context.destination);
   const voices = new Map<number, () => void>();
@@ -29,21 +36,42 @@ export function createBowedString(context: BaseAudioContext) {
     else fail(data.message);
   };
 
-  const schedule: AudioDriver['schedule'] = (frequency, gain, start, end, onEnded): Voice => {
-    if (failed || disposed) throw new Error('Bowed-string renderer is unavailable.');
+  const schedule: AudioDriver['schedule'] = (
+    frequency,
+    gain,
+    start,
+    end,
+    onEnded,
+  ): Voice => {
+    if (failed || disposed)
+      throw new Error('Bowed-string renderer is unavailable.');
     validateString(frequency, context.sampleRate);
-    if (voices.size >= maximumVoices) throw new RangeError('Bowed voice limit reached.');
-    if (!Number.isSafeInteger(Math.round(start * context.sampleRate)) ||
-        !Number.isSafeInteger(Math.round(end * context.sampleRate)) ||
-        Math.round(end * context.sampleRate) <= Math.round(start * context.sampleRate) ||
-        !Number.isFinite(gain) || gain < 0 || gain > 1)
+    if (voices.size >= maximumVoices)
+      throw new RangeError('Bowed voice limit reached.');
+    if (
+      !Number.isSafeInteger(Math.round(start * context.sampleRate)) ||
+      !Number.isSafeInteger(Math.round(end * context.sampleRate)) ||
+      Math.round(end * context.sampleRate) <=
+        Math.round(start * context.sampleRate) ||
+      !Number.isFinite(gain) ||
+      gain < 0 ||
+      gain > 1
+    )
       throw new RangeError('Invalid bowed voice schedule.');
     const id = ++nextId;
     const release = Math.min(0.1, (end - start) / 4);
     let stopTime = end;
     voices.set(id, onEnded);
     try {
-      send({ type: 'start', id, frequency, gain, start, end, seed: Math.imul(id, 0x45d9f3b) >>> 0 });
+      send({
+        type: 'start',
+        id,
+        frequency,
+        gain,
+        start,
+        end,
+        seed: Math.imul(id, 0x45d9f3b) >>> 0,
+      });
     } catch (error) {
       finish(id);
       throw error;
@@ -64,7 +92,9 @@ export function createBowedString(context: BaseAudioContext) {
   };
   return {
     schedule,
-    get failed() { return failed; },
+    get failed() {
+      return failed;
+    },
     dispose() {
       if (disposed) return;
       disposed = true;
