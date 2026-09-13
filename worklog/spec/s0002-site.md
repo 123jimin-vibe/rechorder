@@ -41,7 +41,7 @@ Site-wide requirements; product direction is in s0001.
 - Use Oxlint and Prettier without complicating the stack for TS7 compatibility. Provide editor integration.
 - Pin tool versions and direct dependencies, commit one lockfile, and support Windows-compatible install, development, check, build, and preview commands.
 - Use static HTML entry pages for separate utilities, with a centralized hosting base path.
-- Utilities that need a landscape-sized playing surface may rotate their own viewport by 90 degrees without requiring device rotation. Keep that view container reusable across utilities.
+- Utilities may rotate their own viewport clockwise through 0°, 90°, 180°, and 270° without requiring device rotation. Keep the view container and its input-coordinate orientation reusable across utilities.
 - Publish GitHub Pages artifacts through Actions after checks pass on `main`, with a manual trigger. Default to `/rechorder/`; permit an explicit build base for other hosting paths.
 
 ## Verification

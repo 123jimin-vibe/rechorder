@@ -11,6 +11,10 @@ Similar mistakes from one session may be merged.
 
 Exclude self-corrected mistakes.
 
+### t0010: Rotation and independent piano gestures
+
+The user found that rotation only toggled two orientations, the rotate icon was malformed, rotated scrolling failed, and holding a note prevented scrolling the other row. The shared keyboard also inherited editor-only styling, and unnecessary Upper/Lower labels were added. Test actual swipes in all four orientations, including one held finger with another row scrolling; assigning scrollLeft is not evidence of working gestures. Keep shared component styles self-contained and omit redundant visible labels.
+
 ### t0009: Brassy polyphony from the bowed approximation
 
 The user reports brass-like sound when several notes play together. The t0007 harmonic approximation and signal-level tests did not establish bowed-string realism. Research excitation, body response and interactions between voices; use chord listening comparisons as acceptance evidence instead of treating pitch, sustain and loudness checks as proof of timbre.

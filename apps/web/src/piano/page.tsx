@@ -24,7 +24,6 @@ export function PianoPage({
             aria-label={`${row} keyboard`}
             key={row}
           >
-            <h2>{row}</h2>
             <PianoKeyboard
               controller={controller}
               notes={notes}

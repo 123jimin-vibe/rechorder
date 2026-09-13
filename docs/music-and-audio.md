@@ -68,14 +68,24 @@ it with animation frames only for display. Sources and envelopes use the audio c
 `stopAll()` stops immediately; `dispose()` also closes the context and is idempotent.
 
 The chord page requests a one-second bowed-string audition (65 ms attack and 100 ms release
-included). `string-model.ts` synthesizes band-limited stick/slip-style harmonics shaped
-by body formants, subtle vibrato and bow noise. Excitation sustains throughout the note;
-a normalized source and square-root voice-count gain preserve audible chord energy.
-`bowed-string.ts` owns cached buffers, cancellation envelopes, and a shared compressor
-and soft output ceiling. Midrange harmonics carry low notes on small speakers;
-physical-device listening remains necessary. `web-audio.ts` owns the context.
-A four-million-frame budget bounds individual allocations and the cache (about 16 MB
-each). There are no imported samples or soundfonts. When `engine.running` is true,
+included). `string-model.ts` models nonlinear bow friction between bridge and nut
+waveguides, compensating fractional delays for the bridge filter's phase. Two players
+per note have independent bow motion and subtle vibrato centered on the requested
+frequency. Excitation runs at twice the output rate, with filtering before decimation.
+`string-body.ts` applies the STK violin radiation response at the actual sample rate;
+the low register uses an artistic larger-body scaling, not a measured cello response.
+See [model provenance](../packages/audio/THIRD_PARTY_NOTICES.md).
+
+`bowed-renderer.ts` streams into one AudioWorklet, with audio-frame scheduling and
+release envelopes. The bow lifts on release and stored string/body energy rings down
+inside the release envelope. `bowed-string.ts` owns messages and voice cleanup;
+`web-audio.ts` lazily loads the worklet while resuming the context from the gesture.
+Live and scheduled voices are capped at 64 notes; each player's nominal round-trip
+delay is capped at 65,536 samples. Allocation does not grow with held duration.
+The linear mono mix uses square-root voice-count gain and a 3 ms lookahead peak
+limiter with a 0.88 ceiling, leaving ordinary signals unchanged. Midrange energy is
+tested; physical-device listening remains necessary. There are no soundfonts or
+pre-rendered note buffers. When `engine.running` is true,
 new auditions schedule synchronously before releasing old ones; they never wait for
 an earlier chord or its release. Removing or replacing a source cancels its sound and
 pending request. Hidden pages stop immediately; leaving disposes audio except when
@@ -86,10 +96,13 @@ Keyboard presses use independent handles at one-quarter level, up to ten held ge
 They can sound alongside the chord audition, sustain for up to four seconds, and release
 on pointer/key up, cancellation, lost capture or keyboard blur. Pending gestures are
 identity-checked after audio resume so a released finger cannot produce a late note.
-The keyboard uses pointer capture, horizontal touch panning, optional octave shortcuts and
-Space/Enter support; screen readers retain spelled-note announcements. The free Piano page
-mounts two instances with separate scroll positions and input source IDs. It uses the
-current bowed-string instrument, while the rotatable viewport only changes presentation.
+The shared keyboard owns its key styling, pointer capture, per-finger dragging, optional
+octave shortcuts and Space/Enter support; screen readers retain spelled-note announcements.
+The free Piano page mounts two instances with separate scroll positions and input source IDs.
+Dragging releases that finger's starting note while stationary fingers keep playing. The
+rotatable viewport provides an orientation context so touch drags and wheel input follow
+the keyboard's inline axis through all four orientations. Keyboard surfaces own their touch
+gestures because [browser panning may suppress concurrent pointers](https://www.w3.org/TR/pointerevents3/#the-touch-action-css-property).
 
 ## Near-term extensions
 
@@ -98,7 +111,8 @@ current bowed-string instrument, while the rotatable viewport only changes prese
   Keep meter separate; tuplets and complex beats must not be rounded to a fixed grid.
   Today's progression is untimed, so no placeholder beat fields or tempo state exist.
 - **Tuning and voicing:** resolve another musical adapter before scheduling. Audio
-  accepts finite positive frequencies below the backend's Nyquist limit.
+  accepts continuous frequencies below the backend's Nyquist limit and within its
+  documented delay-allocation bound; tuning is never quantized to MIDI notes.
 - **Instruments and articulation:** replace/extend the audio driver without changing
   progression editing or pitch identities. Backend voices own their resources.
 

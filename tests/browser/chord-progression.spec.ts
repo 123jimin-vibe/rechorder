@@ -442,13 +442,16 @@ test('native bowed sources play together and reach silence', async ({
   const onset = await page.evaluate(() => ({
     energy: window.audioProbe.energy(),
     start: window.audioProbe.starts[0]!,
-    lengths: window.audioProbe.sources.map((node) => node.buffer!.length),
-    rates: window.audioProbe.sources.map((node) => node.playbackRate.value),
+    voices: window.audioProbe.sources,
+    worklets: window.audioProbe.worklets.length,
   }));
   expect(onset.energy).toBeLessThan(0.91);
-  expect(onset.lengths).toHaveLength(3);
-  expect(onset.lengths.every((length) => length > 40000)).toBe(true);
-  expect(onset.rates.every((rate) => rate > 0.98 && rate < 1.02)).toBe(true);
+  expect(onset.voices).toHaveLength(3);
+  expect(onset.worklets).toBe(1);
+  expect(new Set(onset.voices.map((voice) => voice.start)).size).toBe(1);
+  expect(onset.voices.map((voice) => voice.frequency)).toEqual([
+    expect.closeTo(261.6256, 3), expect.closeTo(329.6276, 3), expect.closeTo(391.9954, 3),
+  ]);
   await expect(page.getByLabel('Currently playing notes')).toHaveText(
     'No notes playing',
   );

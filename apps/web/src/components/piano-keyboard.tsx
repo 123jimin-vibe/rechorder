@@ -6,6 +6,7 @@ import {
   defaultChordOctave,
 } from '@rechorder/music';
 import type { ResolvedNote } from '@rechorder/music';
+import { usePianoGestures } from './use-piano-gestures';
 import styles from './piano-keyboard.module.css';
 
 export interface PianoPlayer {
@@ -37,6 +38,7 @@ export function PianoKeyboard({
   readonly fill?: boolean;
 }) {
   const viewport = useRef<HTMLDivElement>(null);
+  const gestures = usePianoGestures(viewport, controller, sourceId);
   function showOctave(octave: number) {
     const element = viewport.current;
     const key = element?.querySelector<HTMLElement>(
@@ -44,10 +46,7 @@ export function PianoKeyboard({
     );
     if (element && key)
       element.scrollTo({
-        left:
-          element.scrollLeft +
-          key.getBoundingClientRect().left -
-          element.getBoundingClientRect().left,
+        left: key.offsetLeft,
       });
   }
   useLayoutEffect(() => {
@@ -80,8 +79,17 @@ export function PianoKeyboard({
         ref={viewport}
         class={styles['viewport']}
         data-keyboard-scroll={sourceId}
+        onPointerMove={gestures.move}
+        onPointerUp={gestures.end}
+        onPointerCancel={gestures.end}
+        onLostPointerCapture={gestures.end}
+        onContextMenu={(event) => event.preventDefault()}
       >
-        <fieldset class={styles['keys']} aria-label={label}>
+        <fieldset
+          class={styles['keys']}
+          aria-label={label}
+          onPointerDown={(event) => gestures.start(event)}
+        >
           {keys.map(({ pitch, note }) => {
             const black = pitch.position.accidental !== 0;
             const sounding = notes.some(
@@ -102,23 +110,7 @@ export function PianoKeyboard({
                 }
                 aria-label={`Play ${note.label}`}
                 aria-pressed={sounding}
-                onPointerDown={(event) => {
-                  if (event.button !== 0) return;
-                  event.currentTarget.setPointerCapture(event.pointerId);
-                  void controller.press(
-                    `${sourceId}:pointer:${event.pointerId}`,
-                    note,
-                  );
-                }}
-                onPointerUp={(event) =>
-                  controller.release(`${sourceId}:pointer:${event.pointerId}`)
-                }
-                onPointerCancel={(event) =>
-                  controller.release(`${sourceId}:pointer:${event.pointerId}`)
-                }
-                onLostPointerCapture={(event) =>
-                  controller.release(`${sourceId}:pointer:${event.pointerId}`)
-                }
+                onPointerDown={(event) => gestures.start(event, note)}
                 onKeyDown={(event) => {
                   if (event.key === ' ' || event.key === 'Enter') {
                     event.preventDefault();

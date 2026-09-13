@@ -29,7 +29,7 @@ test('home links to a reloadable static tool page without asset errors', async (
   await expect(page).toHaveTitle('Piano · Rechorder');
   await page.reload();
   await expect(
-    page.getByRole('button', { name: 'Rotate view 90 degrees' }),
+    page.getByRole('button', { name: 'Rotate view 90 degrees clockwise' }),
   ).toBeVisible();
   expect(errors).toEqual([]);
 });

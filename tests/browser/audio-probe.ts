@@ -1,6 +1,7 @@
 interface AudioProbe {
   readonly contexts: AudioContext[];
-  readonly sources: AudioBufferSourceNode[];
+  readonly sources: { frequency: number; start: number; end: number }[];
+  readonly worklets: AudioWorkletNode[];
   readonly starts: number[];
   resumeCalls: number;
   energy(): number;
@@ -16,12 +17,14 @@ declare global {
 /** Observe native audio, including its rendered waveform; no synthesized test output. */
 export function installAudioProbe(): void {
   const contexts: AudioContext[] = [];
-  const sources: AudioBufferSourceNode[] = [];
+  const sources: { frequency: number; start: number; end: number }[] = [];
+  const worklets: AudioWorkletNode[] = [];
   const starts: number[] = [];
   const analysers: AnalyserNode[] = [];
   window.audioProbe = {
     contexts,
     sources,
+    worklets,
     starts,
     resumeCalls: 0,
     energy() {
@@ -46,36 +49,38 @@ export function installAudioProbe(): void {
     },
   };
   window.AudioContext = class extends AudioContext {
-    private readonly analyser: AnalyserNode;
-
     constructor(options?: AudioContextOptions) {
       super(options);
       contexts.push(this);
-      this.analyser = this.createAnalyser();
-      this.analyser.fftSize = 4096;
-      analysers.push(this.analyser);
-      // Observe the final instrument output, including its dynamics and ceiling.
-      const silent = super.createGain();
-      silent.gain.value = 0;
-      this.analyser.connect(silent).connect(this.destination);
-    }
-
-    override createWaveShaper(): WaveShaperNode {
-      const ceiling = super.createWaveShaper();
-      ceiling.connect(this.analyser);
-      return ceiling;
-    }
-
-    override createBufferSource(): AudioBufferSourceNode {
-      const source = super.createBufferSource();
-      starts.push(this.currentTime);
-      sources.push(source);
-      return source;
     }
 
     override resume(): Promise<void> {
       window.audioProbe.resumeCalls++;
       return super.resume();
+    }
+  };
+  window.AudioWorkletNode = class extends AudioWorkletNode {
+    constructor(context: BaseAudioContext, name: string, options?: AudioWorkletNodeOptions) {
+      super(context, name, options);
+      worklets.push(this);
+      const analyser = context.createAnalyser();
+      analyser.fftSize = 4096;
+      analysers.push(analyser);
+      const silent = context.createGain();
+      silent.gain.value = 0;
+      this.connect(analyser).connect(silent).connect(context.destination);
+      // Observe actual voice events sent to the native renderer, without replacing DSP.
+      const postMessage = this.port.postMessage.bind(this.port);
+      this.port.postMessage = (message: unknown) => {
+        if (typeof message === 'object' && message !== null && 'type' in message && message.type === 'start' &&
+            'frequency' in message && typeof message.frequency === 'number' &&
+            'start' in message && typeof message.start === 'number' &&
+            'end' in message && typeof message.end === 'number') {
+          sources.push({ frequency: message.frequency, start: message.start, end: message.end });
+          starts.push(context.currentTime);
+        }
+        postMessage(message);
+      };
     }
   };
 }

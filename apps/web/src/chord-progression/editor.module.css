@@ -30,7 +30,7 @@
     padding: 0;
     color: var(--muted);
   }
-  & button {
+  & :where(button) {
     min-block-size: 2.75rem;
     border: 1px solid var(--border);
     border-radius: 0.625rem;
@@ -40,19 +40,19 @@
     cursor: pointer;
     touch-action: manipulation;
   }
-  & button:disabled {
+  & :where(button:disabled) {
     color: var(--muted);
     background: var(--canvas);
     cursor: default;
     opacity: 0.65;
   }
   @media (hover: hover) {
-    & button:not(:disabled):hover {
+    & :where(button:not(:disabled):hover) {
       border-color: var(--accent);
       background: var(--accent-soft);
     }
   }
-  & button[aria-pressed='true'] {
+  & :where(button[aria-pressed='true']) {
     background: var(--accent-soft);
     border-color: var(--accent);
     color: var(--accent);
