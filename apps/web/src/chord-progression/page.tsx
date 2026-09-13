@@ -19,7 +19,7 @@ import type { WesternChord } from '@rechorder/music';
 import type { ActiveNote } from '@rechorder/audio';
 import type { AuditionController } from './audition';
 import { editorReducer, initialEditor } from './editor';
-import { ChordOptions, rootPads } from './chord-options';
+import { BassOptions, JazzOptions, rootPads } from './chord-options';
 import { MusicalText } from './musical-text';
 import { Piano } from './piano';
 import styles from './editor.module.css';
@@ -105,6 +105,18 @@ export function EditorPage({
         </a>
         <h1>Chord progression</h1>
       </header>
+
+      <section class={styles['playingRow']} aria-labelledby="playing-heading">
+        <h2 id="playing-heading">
+          <span
+            class={styles['indicator']}
+            data-sounding={uniqueNotes.length > 0}
+            aria-hidden="true"
+          />
+          Now playing
+        </h2>
+        <Piano controller={controller} notes={uniqueNotes} />
+      </section>
 
       <section class={styles['timeline']} aria-labelledby="progression-heading">
         <div class={styles['sectionHeading']}>
@@ -198,54 +210,6 @@ export function EditorPage({
           </button>
         </div>
 
-        <div class={styles['choices']}>
-          <fieldset>
-            <legend>Root</legend>
-            <div class={styles['roots']}>
-              {rootPads.map((root) => (
-                <button
-                  type="button"
-                  key={root.id}
-                  aria-label={`Root ${root.id}`}
-                  aria-pressed={rootId === root.id}
-                  onClick={() =>
-                    auditionCandidate({ ...candidate, root: root.pitch })
-                  }
-                >
-                  <MusicalText text={root.id} />
-                </button>
-              ))}
-            </div>
-          </fieldset>
-          <fieldset>
-            <legend>Chord type</legend>
-            <div class={styles['types']}>
-              {chordDefinitions.map((definition) => (
-                <button
-                  type="button"
-                  key={definition.id}
-                  aria-label={definition.label}
-                  aria-pressed={candidate.definition.id === definition.id}
-                  onClick={() => {
-                    if (rootId)
-                      auditionCandidate({
-                        ...createChord(rootId, definition.id),
-                        ...(candidate.bass ? { bass: candidate.bass } : {}),
-                      });
-                  }}
-                >
-                  {definition.suffix || 'Major'}
-                  {definition.id === 'minor' && (
-                    <span class={styles['typeHint']}>Minor</span>
-                  )}
-                </button>
-              ))}
-            </div>
-          </fieldset>
-        </div>
-
-        <ChordOptions chord={candidate} onChange={auditionCandidate} />
-
         <div class={styles['commits']}>
           <button
             type="button"
@@ -274,18 +238,58 @@ export function EditorPage({
             Replace
           </button>
         </div>
-      </section>
 
-      <section class={styles['playingRow']} aria-labelledby="playing-heading">
-        <h2 id="playing-heading">
-          <span
-            class={styles['indicator']}
-            data-sounding={uniqueNotes.length > 0}
-            aria-hidden="true"
-          />
-          Now playing
-        </h2>
-        <Piano controller={controller} notes={uniqueNotes} />
+        <div class={styles['choices']}>
+          <fieldset class={styles['choiceGroup']} aria-label="Root and bass">
+            <fieldset>
+              <legend>Root</legend>
+              <div class={styles['roots']}>
+                {rootPads.map((root) => (
+                  <button
+                    type="button"
+                    key={root.id}
+                    aria-label={`Root ${root.id}`}
+                    aria-pressed={rootId === root.id}
+                    onClick={() =>
+                      auditionCandidate({ ...candidate, root: root.pitch })
+                    }
+                  >
+                    <MusicalText text={root.id} />
+                  </button>
+                ))}
+              </div>
+            </fieldset>
+            <BassOptions chord={candidate} onChange={auditionCandidate} />
+          </fieldset>
+          <fieldset class={styles['choiceGroup']} aria-label="Chord quality">
+            <fieldset>
+              <legend>Chord type</legend>
+              <div class={styles['types']}>
+                {chordDefinitions.map((definition) => (
+                  <button
+                    type="button"
+                    key={definition.id}
+                    aria-label={definition.label}
+                    aria-pressed={candidate.definition.id === definition.id}
+                    onClick={() => {
+                      if (rootId)
+                        auditionCandidate({
+                          ...createChord(rootId, definition.id),
+                          ...(candidate.bass ? { bass: candidate.bass } : {}),
+                        });
+                    }}
+                  >
+                    {definition.suffix || 'Major'}
+                    {definition.id === 'minor' && (
+                      <span class={styles['typeHint']}>Minor</span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </fieldset>
+            <JazzOptions chord={candidate} onChange={auditionCandidate} />
+          </fieldset>
+        </div>
       </section>
     </main>
   );

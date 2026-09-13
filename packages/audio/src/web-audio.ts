@@ -1,9 +1,9 @@
 import type { AudioDriver } from './driver';
-import { createPluckedString } from './plucked-string';
+import { createBowedString } from './bowed-string';
 
 export function createWebAudioDriver(): AudioDriver {
   const context = new AudioContext();
-  const instrument = createPluckedString(context);
+  const instrument = createBowedString(context);
   return {
     get currentTime() {
       return context.currentTime;

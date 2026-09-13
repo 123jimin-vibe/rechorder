@@ -4,6 +4,7 @@ interface AudioProbe {
   readonly starts: number[];
   resumeCalls: number;
   energy(): number;
+  rms(): number;
 }
 
 declare global {
@@ -32,6 +33,17 @@ export function installAudioProbe(): void {
       }
       return peak;
     },
+    rms() {
+      let energy = 0;
+      let count = 0;
+      for (const analyser of analysers) {
+        const samples = new Float32Array(analyser.fftSize);
+        analyser.getFloatTimeDomainData(samples);
+        for (const sample of samples) energy += sample * sample;
+        count += samples.length;
+      }
+      return count ? Math.sqrt(energy / count) : 0;
+    },
   };
   window.AudioContext = class extends AudioContext {
     private readonly analyser: AnalyserNode;
@@ -40,18 +52,18 @@ export function installAudioProbe(): void {
       super(options);
       contexts.push(this);
       this.analyser = this.createAnalyser();
-      this.analyser.fftSize = 512;
+      this.analyser.fftSize = 4096;
       analysers.push(this.analyser);
-      // The silent side branch observes each voice's actual gain envelope.
+      // Observe the final instrument output, including its dynamics and ceiling.
       const silent = super.createGain();
       silent.gain.value = 0;
       this.analyser.connect(silent).connect(this.destination);
     }
 
-    override createGain(): GainNode {
-      const gain = super.createGain();
-      gain.connect(this.analyser);
-      return gain;
+    override createWaveShaper(): WaveShaperNode {
+      const ceiling = super.createWaveShaper();
+      ceiling.connect(this.analyser);
+      return ceiling;
     }
 
     override createBufferSource(): AudioBufferSourceNode {

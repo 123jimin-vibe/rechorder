@@ -11,6 +11,14 @@ Similar mistakes from one session may be merged.
 
 Exclude self-corrected mistakes.
 
+### t0008: Group controls by musical role
+
+The user corrected the visual hierarchy: Bass belongs with Root, and Jazz & extensions belongs under Chord type. Preserve these relationships in the document structure so desktop columns and mobile stacking communicate the same grouping.
+
+### t0007: Bowed character and audible compact editor
+
+The user found the plucked implementation guitar-like and barely audible on mobile, and root, bass, jazz, and commit controls too bulky. Use sustained bowed excitation with useful upper harmonics and verify output levels across chord sizes. Place playback feedback above the timeline and compact commits above root selection; assess expanded mobile controls as well as collapsed views.
+
 ### t0006: Timeline geometry and string sound
 
 The user reported vertical timeline scrolling, cropped chord buttons, unreliable append visibility, loose sharp spacing, and a keyboard-like synth timbre. Reserve space for native scrollbars and test complete button bounds, not just container height. Verify append and selection scrolling independently. A harmonic oscillator envelope alone did not achieve the requested string character. The user also superseded the earlier selection-centering requirement.

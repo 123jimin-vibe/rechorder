@@ -162,7 +162,7 @@ export function createPlaybackEngine(
           playback.voices.push(
             clock.schedule(
               note.frequency,
-              (0.18 * level) / notes.length,
+              (0.5 * level) / Math.sqrt(notes.length),
               start,
               playback.end,
               () => {

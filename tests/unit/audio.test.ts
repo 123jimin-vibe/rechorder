@@ -27,8 +27,8 @@ describe('audio scheduling engine', () => {
     expect(
       driver.voices.map((voice) => [voice.start, voice.end, voice.gain]),
     ).toEqual([
-      [2, 3, 0.09],
-      [2, 3, 0.09],
+      [2, 3, 0.5 / Math.sqrt(2)],
+      [2, 3, 0.5 / Math.sqrt(2)],
     ]);
     driver.advance(0.95);
     expect(engine.activeNotes()).toHaveLength(2);
@@ -162,7 +162,7 @@ describe('page audition policy', () => {
     controller.release('finger2');
     driver.advance(0.11);
     expect(controller.notes().map((item) => item.note.label)).toEqual(['A4']);
-    expect(driver.voices[1]?.gain).toBe(0.045);
+    expect(driver.voices[1]?.gain).toBe(0.125);
     controller.stopAll();
     expect(controller.notes()).toEqual([]);
     await controller.press('finger3', notes[0]!);

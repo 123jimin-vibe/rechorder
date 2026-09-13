@@ -19,11 +19,11 @@ Provide reusable individual-chord playback for candidate and list-item actions i
 
 ## Contract
 
-- Native Web Audio plays locally synthesized plucked strings: an excited, damped delay line with pitch correction and a gentle body resonance. Keep DSP and instrument construction separate from scheduling; no soundfonts. Bound synthesized-buffer allocation and caching.
-- An audition plays all resolved notes together for one second, including a 5 ms attack and 100 ms release, with conservative gain normalized by voice count. Scale envelope segments for shorter scheduled notes.
+- Native Web Audio plays locally synthesized sustained bowed strings with violin/cello-like character: band-limited harmonics, body resonances, subtle vibrato and bow noise. Keep DSP and instrument construction separate from scheduling; no soundfonts. Bound synthesized-buffer allocation and caching.
+- An audition plays all resolved notes together for one second, including a 65 ms attack and 100 ms release. Normalize gain by the square root of voice count to retain chord energy, with shared dynamics and a bounded output stage for overlapping voices. Preserve audible midrange harmonics for mobile speakers. Scale envelope segments for shorter scheduled notes.
 - The playback contract accepts resolved notes, audio-clock start time, duration and optional normalized level, and returns a cancellable handle with stable playback ID and lifecycle state.
 - One chord audition is active across the page. A new request starts immediately at the current audio time, without awaiting the previous chord, its release, or reinitialization of running audio. It releases the previous audition concurrently; the application applies this policy while the sound contract remains independently cancellable for future sequencing.
-- Keyboard gestures own independent cancellable voices, capped at ten concurrent held inputs with conservative fixed gain. Held strings decay for up to four seconds; releasing a gesture releases its voice. A release while audio initializes prevents a late note. Hidden-page stop/disposal also clears held inputs.
+- Keyboard gestures own independent cancellable voices, capped at ten concurrent held inputs with conservative fixed gain. Held strings sustain for up to four seconds; releasing a gesture releases its voice. A release while audio initializes prevents a late note. Hidden-page stop/disposal also clears held inputs.
 - Report active notes and scheduled start/end through the playback lifecycle, including release. The note display follows that state.
 - Create/resume audio only from a musical user gesture. The application owns disposal, stops sound on page hidden, and the latest chord request wins while initialization is pending.
 - On initialization or playback failure, log the error with `console.error` and keep editing usable. A snackbar replaces this reporting path later.

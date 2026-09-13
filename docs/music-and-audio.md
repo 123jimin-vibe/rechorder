@@ -29,7 +29,7 @@ voicing. `Tuning<Position>.frequency(position)` resolves a pitch at the audio bo
 Enharmonic pitches can sound alike while retaining distinct spellings.
 
 The `western.ts` adapter owns letter/accidental/octave coordinates, diatonic/chromatic
-intervals, basic/jazz definitions, explicit alterations, close root-position voicing, and 12-EDO at A4 = 440 Hz.
+intervals, basic/jazz definitions, explicit alterations, close root-position voicing rooted in octave 4, and 12-EDO at A4 = 440 Hz.
 Those restrictions do not apply to the generic models. Other systems supply their own
 position/interval types, voicing, and tuning; tests exercise a non-octave period and
 unequal rational frequency ratios through the same resolution boundary.
@@ -37,7 +37,7 @@ unequal rational frequency ratios through the same resolution boundary.
 Jazz definitions provide complete ascending stacks, with no implicit omissions. Alterations
 replace or add a diatonic degree; changing type resets modifiers. Slash bass is voiced in
 the nearest octave strictly below the full upper structure. The conventional adapter
-also provides C1–B5 piano pitches; keyboard rendering matches sounding frequencies rather
+also provides C1–B6 piano pitches; keyboard rendering matches sounding frequencies rather
 than spellings. Musical symbols follow the [Open Music Theory chord-symbol conventions](https://pressbooks.nebraska.edu/openmusictheory/chapter/chord-symbols/).
 
 `ProgressionEntry<Value>` adds a stable ID to a value. Operations return new arrays;
@@ -65,14 +65,15 @@ scheduled, suspended, and finished voices are silent in this snapshot. The UI po
 it with animation frames only for display. Sources and envelopes use the audio clock.
 `stopAll()` stops immediately; `dispose()` also closes the context and is idempotent.
 
-The page requests a one-second plucked-string audition (5 ms attack and 100 ms release
-included). `string-model.ts` implements an excited lossy delay line based on
-[Karplus–Strong string synthesis](https://www.dsprelated.com/freebooks/pasp/Karplus_Strong_Algorithm.html).
-Averaging damps high partials; source playback rate compensates the filter's half-sample
-delay at the fundamental. `plucked-string.ts` owns synthesized buffers, a gentle body
-resonance and cancellation envelopes; `web-audio.ts` owns the context. A four-million-frame
-budget bounds both individual DSP allocations and cached buffers (about 16 MB each).
-There are no imported samples or soundfonts. When `engine.running` is true,
+The page requests a one-second bowed-string audition (65 ms attack and 100 ms release
+included). `string-model.ts` synthesizes band-limited stick/slip-style harmonics shaped
+by body formants, subtle vibrato and bow noise. Excitation sustains throughout the note;
+a normalized source and square-root voice-count gain preserve audible chord energy.
+`bowed-string.ts` owns cached buffers, cancellation envelopes, and a shared compressor
+and soft output ceiling. Midrange harmonics carry low notes on small speakers;
+physical-device listening remains necessary. `web-audio.ts` owns the context.
+A four-million-frame budget bounds individual allocations and the cache (about 16 MB
+each). There are no imported samples or soundfonts. When `engine.running` is true,
 new auditions schedule synchronously before releasing old ones; they never wait for
 an earlier chord or its release. Removing or replacing a source cancels its sound and
 pending request. Hidden pages stop immediately; leaving disposes audio except when
@@ -80,7 +81,7 @@ the browser preserves the page in its back/forward cache. Errors go to `console.
 the controller's reporting callback can later show a snackbar.
 
 Keyboard presses use independent handles at one-quarter level, up to ten held gestures.
-They can sound alongside the chord audition, decay for up to four seconds, and release
+They can sound alongside the chord audition, sustain for up to four seconds, and release
 on pointer/key up, cancellation, lost capture or keyboard blur. Pending gestures are
 identity-checked after audio resume so a released finger cannot produce a late note.
 The keyboard uses pointer capture, horizontal touch panning, octave shortcuts and

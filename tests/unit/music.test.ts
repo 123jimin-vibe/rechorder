@@ -39,15 +39,15 @@ describe('conventional chord adapter', () => {
     const chord = createChord('C', 'major9', 'E');
     expect(chordSymbol(chord)).toBe('Cmaj9/E');
     expect(voiceChord(chord).map((pitch) => pitch.spelling)).toEqual([
-      'E2',
-      'C3',
       'E3',
-      'G3',
-      'B3',
-      'D4',
+      'C4',
+      'E4',
+      'G4',
+      'B4',
+      'D5',
     ]);
     expect(voiceChord(createChord('C♭', 'minor', 'B♯'))[0]?.spelling).toBe(
-      'B♯1',
+      'B♯2',
     );
     expect(() => createChord('C', 'major', 'H')).toThrow();
   });
@@ -58,14 +58,14 @@ describe('conventional chord adapter', () => {
     ]);
     expect(chordSymbol(chord)).toBe('F♯13(♭9,♯11)/E');
     expect(voiceChord(chord).map((pitch) => pitch.spelling)).toEqual([
-      'E3',
-      'F♯3',
-      'A♯3',
-      'C♯4',
       'E4',
-      'G4',
-      'B♯4',
-      'D♯5',
+      'F♯4',
+      'A♯4',
+      'C♯5',
+      'E5',
+      'G5',
+      'B♯5',
+      'D♯6',
     ]);
     expect(chordRecipe(chord)).toEqual({
       definitionId: 'dominant13',
@@ -74,25 +74,25 @@ describe('conventional chord adapter', () => {
     expect(chordSymbol(alterChord(chord, []))).toBe('F♯13/E');
     expect(() => alterChord(chord, ['♭9', '♯9'])).toThrow();
     expect(voiceChord(createChord('C', 'diminished7')).at(-1)?.spelling).toBe(
-      'B♭♭3',
+      'B♭♭4',
     );
     expect(
       voiceChord(createChord('C', 'halfDiminished7')).at(-1)?.spelling,
-    ).toBe('B♭3');
+    ).toBe('B♭4');
     expect(
       voiceChord(createChord('C', 'sixNine')).map((pitch) => pitch.spelling),
-    ).toEqual(['C3', 'E3', 'G3', 'A3', 'D4']);
+    ).toEqual(['C4', 'E4', 'G4', 'A4', 'D5']);
   });
   it.each([
-    ['major', ['C3', 'E3', 'G3']],
-    ['minor', ['C3', 'E♭3', 'G3']],
-    ['diminished', ['C3', 'E♭3', 'G♭3']],
-    ['augmented', ['C3', 'E3', 'G♯3']],
-    ['sus2', ['C3', 'D3', 'G3']],
-    ['sus4', ['C3', 'F3', 'G3']],
-    ['dominant7', ['C3', 'E3', 'G3', 'B♭3']],
-    ['major7', ['C3', 'E3', 'G3', 'B3']],
-    ['minor7', ['C3', 'E♭3', 'G3', 'B♭3']],
+    ['major', ['C4', 'E4', 'G4']],
+    ['minor', ['C4', 'E♭4', 'G4']],
+    ['diminished', ['C4', 'E♭4', 'G♭4']],
+    ['augmented', ['C4', 'E4', 'G♯4']],
+    ['sus2', ['C4', 'D4', 'G4']],
+    ['sus4', ['C4', 'F4', 'G4']],
+    ['dominant7', ['C4', 'E4', 'G4', 'B♭4']],
+    ['major7', ['C4', 'E4', 'G4', 'B4']],
+    ['minor7', ['C4', 'E♭4', 'G4', 'B♭4']],
   ])('spells %s in root position', (quality, labels) => {
     expect(
       voiceChord(createChord('C', quality)).map((pitch) => pitch.spelling),
@@ -102,8 +102,8 @@ describe('conventional chord adapter', () => {
   it('preserves enharmonic identity while resolving equal sounding pitches', () => {
     const sharp = voiceChord(createChord('C♯', 'major'));
     const flat = voiceChord(createChord('D♭', 'major'));
-    expect(sharp.map((pitch) => pitch.spelling)).toEqual(['C♯3', 'E♯3', 'G♯3']);
-    expect(flat.map((pitch) => pitch.spelling)).toEqual(['D♭3', 'F3', 'A♭3']);
+    expect(sharp.map((pitch) => pitch.spelling)).toEqual(['C♯4', 'E♯4', 'G♯4']);
+    expect(flat.map((pitch) => pitch.spelling)).toEqual(['D♭4', 'F4', 'A♭4']);
     expect(
       resolvePitches(sharp, standardTuning).map((note) => note.frequency),
     ).toEqual(
@@ -114,10 +114,10 @@ describe('conventional chord adapter', () => {
   it('handles register crossings and double accidentals', () => {
     expect(
       voiceChord(createChord('B♯', 'major')).map((pitch) => pitch.spelling),
-    ).toEqual(['B♯3', 'D♯♯4', 'F♯♯4']);
+    ).toEqual(['B♯4', 'D♯♯5', 'F♯♯5']);
     expect(
       voiceChord(createChord('B', 'minor7')).map((pitch) => pitch.spelling),
-    ).toEqual(['B3', 'D4', 'F♯4', 'A4']);
+    ).toEqual(['B4', 'D5', 'F♯5', 'A5']);
     expect(chordSymbol(createChord('B♭', 'dominant7'))).toBe('B♭7');
   });
 

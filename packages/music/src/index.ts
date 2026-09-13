@@ -25,6 +25,7 @@ export {
   chordRecipe,
   alterChord,
   pianoPitches,
+  defaultChordOctave,
 } from './western';
 export type { ProgressionEntry } from './progression';
 export {

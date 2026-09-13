@@ -14,13 +14,12 @@ export const rootPads = [1, 0, -1].flatMap((accidental) =>
   roots.filter((root) => root.pitch.position.accidental === accidental),
 );
 
-export function ChordOptions({
-  chord,
-  onChange,
-}: {
+interface OptionsProps {
   readonly chord: WesternChord;
   readonly onChange: (chord: WesternChord) => void;
-}) {
+}
+
+export function JazzOptions({ chord, onChange }: OptionsProps) {
   const recipe = chordRecipe(chord);
   const rootId = roots.find(
     (root) =>
@@ -81,6 +80,18 @@ export function ChordOptions({
           ))}
         </fieldset>
       </details>
+    </div>
+  );
+}
+
+export function BassOptions({ chord, onChange }: OptionsProps) {
+  const bassId = roots.find(
+    (root) =>
+      root.pitch.position.letter === chord.bass?.position.letter &&
+      root.pitch.position.accidental === chord.bass.position.accidental,
+  )?.id;
+  return (
+    <div class={styles['extras']}>
       <details>
         <summary>
           Bass

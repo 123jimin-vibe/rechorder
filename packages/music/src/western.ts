@@ -95,9 +95,15 @@ function spelledPitch(position: WesternPosition): Pitch<WesternPosition> {
   return { position, spelling: rootLabel(position) + position.octave };
 }
 
+export const defaultChordOctave = 4;
+
 export const roots = letters.flatMap((letter) =>
   [-1, 0, 1].map((accidental) => {
-    const position: WesternPosition = { letter, accidental, octave: 3 };
+    const position: WesternPosition = {
+      letter,
+      accidental,
+      octave: defaultChordOctave,
+    };
     return { id: rootLabel(position), pitch: spelledPitch(position) };
   }),
 );
@@ -356,7 +362,7 @@ export function alterChord(
 }
 
 /** Keyboard coordinates stay in the western adapter, outside generic pitch types. */
-export const pianoPitches = [1, 2, 3, 4, 5].flatMap((octave) =>
+export const pianoPitches = [1, 2, 3, 4, 5, 6].flatMap((octave) =>
   letters.flatMap((letter) =>
     (letter === 'E' || letter === 'B' ? [0] : [0, 1]).map((accidental) =>
       spelledPitch({ letter, accidental, octave }),

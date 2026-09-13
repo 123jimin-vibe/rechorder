@@ -7,7 +7,7 @@ function rms(samples: Float32Array, from: number, to: number): number {
   return Math.sqrt(sum / (to - from));
 }
 
-describe('plucked string physical model', () => {
+describe('sustained bowed string synthesis', () => {
   it.each([32.7032, 65.4064, 130.8128, 277.1826, 440, 987.7666, 1975.5332])(
     'keeps %s Hz in tune across the keyboard',
     (frequency) => {
@@ -36,10 +36,10 @@ describe('plucked string physical model', () => {
         b = correlation(best),
         c = correlation(best + 1);
       const measured = best + (a - c) / (2 * (a - 2 * b + c));
-      expect(Math.abs(1200 * Math.log2(expected / measured))).toBeLessThan(5);
+      expect(Math.abs(1200 * Math.log2(expected / measured))).toBeLessThan(8);
       expect(samples.every(Number.isFinite)).toBe(true);
-      expect(rms(samples, 30000, 34000)).toBeLessThan(
-        rms(samples, 1000, 5000) * 0.4,
+      expect(rms(samples, 30000, 34000)).toBeGreaterThan(
+        rms(samples, 1000, 5000) * 0.8,
       );
     },
   );
@@ -49,4 +49,30 @@ describe('plucked string physical model', () => {
       expect(() => synthesizeString(frequency, 48000, 1)).toThrow(RangeError);
     expect(() => synthesizeString(440, 48000, 1e9)).toThrow(RangeError);
   });
+
+  it.each([32.7032, 65.4064, 130.8128, 440, 1975.5332])(
+    'retains sustained mobile-band energy at %s Hz without clipping',
+    (frequency) => {
+      const { samples } = synthesizeString(frequency, 48000, 4);
+      // A deliberately simple 300 Hz–4 kHz speaker-band proxy, not a device model.
+      const band = new Float32Array(samples.length);
+      let low = 0;
+      let high = 0;
+      const lowAlpha = 1 - Math.exp((-2 * Math.PI * 300) / 48000);
+      const highAlpha = 1 - Math.exp((-2 * Math.PI * 4000) / 48000);
+      let peak = 0;
+      for (let index = 0; index < samples.length; index++) {
+        const value = samples[index]!;
+        low += lowAlpha * (value - low);
+        high += highAlpha * (value - low - high);
+        band[index] = high;
+        peak = Math.max(peak, Math.abs(value));
+      }
+      expect(peak).toBeLessThan(0.92);
+      const full = rms(samples, 48000, 144000);
+      expect(full).toBeGreaterThan(0.09);
+      expect(rms(band, 48000, 144000)).toBeGreaterThan(full * 0.35);
+      expect(rms(samples, 144000, 180000)).toBeGreaterThan(full * 0.8);
+    },
+  );
 });

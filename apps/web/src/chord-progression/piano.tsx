@@ -1,9 +1,18 @@
 import { useLayoutEffect, useRef } from 'preact/hooks';
-import { pianoPitches, resolvePitches, standardTuning } from '@rechorder/music';
+import {
+  pianoPitches,
+  resolvePitches,
+  standardTuning,
+  defaultChordOctave,
+} from '@rechorder/music';
 import type { ResolvedNote } from '@rechorder/music';
 import type { AuditionController } from './audition';
 import { MusicalText } from './musical-text';
 import styles from './piano.module.css';
+
+const octaves = [
+  ...new Set(pianoPitches.map((pitch) => pitch.position.octave)),
+];
 
 const keys = pianoPitches.map((pitch) => ({
   pitch,
@@ -32,12 +41,12 @@ export function Piano({
       });
   }
   useLayoutEffect(() => {
-    showOctave(3);
+    showOctave(defaultChordOctave);
   }, []);
   return (
     <div class={styles['piano']}>
       <nav aria-label="Keyboard octave" class={styles['octaves']}>
-        {[1, 2, 3, 4, 5].map((octave) => (
+        {octaves.map((octave) => (
           <button
             type="button"
             key={octave}

@@ -23,7 +23,7 @@ title = "Musical Model"
 ## Initial values for t0002
 
 - Tuning: 12-tone equal temperament, A4 = 440 Hz.
-- Voicing: fixed root-position close voicing with the root in octave 3.
+- Voicing: fixed root-position close voicing with the root in octave 4.
 - Chord catalogue: major, minor, diminished, augmented, sus2, sus4, dominant seventh, major seventh, and minor seventh.
 - The progression is untimed. Audition duration is not musical beat data.
 

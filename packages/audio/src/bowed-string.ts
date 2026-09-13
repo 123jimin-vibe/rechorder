@@ -2,9 +2,26 @@ import type { AudioDriver, Voice } from './driver';
 import { synthesizeString } from './string-model';
 
 /** Buffers are synthesized locally; the bounded cache avoids repeated DSP during transcription. */
-export function createPluckedString(
+export function createBowedString(
   context: BaseAudioContext,
 ): AudioDriver['schedule'] {
+  // Shared dynamics preserve chord energy while containing overlapping release tails.
+  const compressor = context.createDynamicsCompressor();
+  compressor.threshold.value = -12;
+  compressor.knee.value = 12;
+  compressor.ratio.value = 6;
+  compressor.attack.value = 0.003;
+  compressor.release.value = 0.12;
+  const ceiling = context.createWaveShaper();
+  const curve = new Float32Array(2049);
+  for (let index = 0; index < curve.length; index++) {
+    const value = (index / (curve.length - 1)) * 2 - 1;
+    curve[index] = 0.9 * Math.tanh(value / 0.9);
+  }
+  ceiling.curve = curve;
+  ceiling.oversample = '2x';
+  const output = compressor;
+  compressor.connect(ceiling).connect(context.destination);
   const cache = new Map<string, { buffer: AudioBuffer; rate: number }>();
   let cachedFrames = 0;
   const frameBudget = 4_000_000;
@@ -12,8 +29,8 @@ export function createPluckedString(
     const duration = end - start;
     const seconds = Math.ceil(duration * 4) / 4;
     const cacheKey = frequency + ':' + seconds;
-    let pluck = cache.get(cacheKey);
-    if (!pluck) {
+    let tone = cache.get(cacheKey);
+    if (!tone) {
       const model = synthesizeString(frequency, context.sampleRate, seconds);
       const buffer = context.createBuffer(
         1,
@@ -21,7 +38,7 @@ export function createPluckedString(
         context.sampleRate,
       );
       buffer.copyToChannel(model.samples, 0);
-      pluck = { buffer, rate: model.playbackRate };
+      tone = { buffer, rate: model.playbackRate };
       while (cachedFrames + buffer.length > frameBudget && cache.size) {
         const oldest = cache.entries().next().value;
         if (!oldest) break;
@@ -29,14 +46,14 @@ export function createPluckedString(
         cachedFrames -= oldest[1].buffer.length;
       }
       if (buffer.length <= frameBudget) {
-        cache.set(cacheKey, pluck);
+        cache.set(cacheKey, tone);
         cachedFrames += buffer.length;
       }
     }
     const source = context.createBufferSource();
-    const body = context.createBiquadFilter();
+
     const envelope = context.createGain();
-    const attack = Math.min(0.005, duration / 4);
+    const attack = Math.min(0.065, duration / 4);
     const release = Math.min(0.1, duration / 4);
     let finished = false;
     let stopTime = end;
@@ -44,22 +61,18 @@ export function createPluckedString(
       if (finished) return;
       finished = true;
       source.disconnect();
-      body.disconnect();
+
       envelope.disconnect();
       onEnded();
     };
     try {
-      source.buffer = pluck.buffer;
-      source.playbackRate.setValueAtTime(pluck.rate, start);
-      body.type = 'peaking';
-      body.frequency.value = 180;
-      body.Q.value = 0.7;
-      body.gain.value = 2;
+      source.buffer = tone.buffer;
+      source.playbackRate.setValueAtTime(tone.rate, start);
       envelope.gain.setValueAtTime(0, start);
       envelope.gain.linearRampToValueAtTime(gain, start + attack);
       envelope.gain.setValueAtTime(gain, end - release);
       envelope.gain.linearRampToValueAtTime(0, end);
-      source.connect(body).connect(envelope).connect(context.destination);
+      source.connect(envelope).connect(output);
       source.onended = cleanup;
       source.start(start);
       source.stop(end);
