@@ -5,7 +5,7 @@ import type {
 } from '@rechorder/audio';
 import type { ResolvedNote } from '@rechorder/music';
 
-export const progressionBpm = 150;
+export const progressionBpm = 120;
 export const progressionBeatsPerChord = 2;
 export const progressionChordDuration =
   (60 / progressionBpm) * progressionBeatsPerChord;

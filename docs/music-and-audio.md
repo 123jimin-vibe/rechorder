@@ -95,7 +95,7 @@ the browser preserves the page in its back/forward cache. Errors go to `console.
 the controller's reporting callback can later show a snackbar.
 
 The progression transport snapshots entries on a stopped start and currently assigns
-each one two quarter-note beats at 150 BPM (0.8 seconds). It maintains a bounded
+each one two quarter-note beats at 120 BPM (1 second). It maintains a bounded
 lookahead, but every voice uses an audio-clock start so JavaScript timer jitter does not
 move chord boundaries. Pause cancels scheduled handles and retains the exact elapsed
 offset; Play schedules the remaining part of the current chord and resumes the snapshot.

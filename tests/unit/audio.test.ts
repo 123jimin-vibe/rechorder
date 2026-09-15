@@ -174,15 +174,14 @@ describe('page audition policy', () => {
     ];
 
     await controller.playProgression(progression);
-    expect(progressionChordDuration).toBeCloseTo(0.8);
+    expect(progressionChordDuration).toBeCloseTo(1);
     expect(controller.progressionState()).toEqual({
       status: 'playing',
       currentIndex: 0,
     });
     expect(driver.voices.map((voice) => [voice.start, voice.end])).toEqual([
-      [0, 0.8],
-      [0, 0.8],
-      [0.8, 1.6],
+      [0, 1],
+      [0, 1],
     ]);
 
     driver.advance(0.4);
@@ -191,18 +190,17 @@ describe('page audition policy', () => {
       status: 'paused',
       currentIndex: 0,
     });
-    expect(driver.voices.map((voice) => voice.end)).toEqual([0.5, 0.5, 1.6]);
-    expect(driver.voices[2]?.stopped).toBe(true);
+    expect(driver.voices.map((voice) => voice.end)).toEqual([0.5, 0.5]);
 
     await controller.playProgression([]);
     expect(
-      driver.voices.slice(3).map((voice) => [voice.start, voice.end]),
+      driver.voices.slice(2).map((voice) => [voice.start, voice.end]),
     ).toEqual([
-      [0.4, 0.8],
-      [0.4, 0.8],
-      [0.8, 1.6],
+      [0.4, 1],
+      [0.4, 1],
+      [1, 2],
     ]);
-    driver.advance(0.5);
+    driver.advance(0.7);
     expect(controller.progressionState()).toEqual({
       status: 'playing',
       currentIndex: 1,
@@ -221,8 +219,8 @@ describe('page audition policy', () => {
     });
     const fromSecond = driver.voices.slice(before);
     expect(fromSecond).toHaveLength(1);
-    expect(fromSecond[0]?.start).toBeCloseTo(0.9);
-    expect(fromSecond[0]?.end).toBeCloseTo(1.7);
+    expect(fromSecond[0]?.start).toBeCloseTo(1.1);
+    expect(fromSecond[0]?.end).toBeCloseTo(2.1);
     controller.stopProgression();
   });
 
@@ -261,14 +259,14 @@ describe('page audition policy', () => {
       notes,
     }));
     await controller.playProgression(progression);
-    expect(driver.voices).toHaveLength(4);
+    expect(driver.voices).toHaveLength(2);
     driver.advance(0.75);
     controller.progressionState();
-    expect(driver.voices).toHaveLength(6);
+    expect(driver.voices).toHaveLength(4);
     controller.stopProgression();
 
     await controller.playProgression([{ source: 'one', notes }]);
-    driver.advance(0.81);
+    driver.advance(1.01);
     expect(controller.progressionState()).toEqual({
       status: 'stopped',
       currentIndex: null,

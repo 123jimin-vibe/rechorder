@@ -27,7 +27,7 @@ title = "Chord Progression"
 ## Progression playback
 
 - Provide Play, Play from here, and Stop beside the progression. Play starts at the beginning when stopped and resumes from the preserved position after an individual audition pauses it. Play from here starts a fresh snapshot at the selected entry; disable it without a selection and while transport is playing. Stop and natural completion reset to the beginning. Use distinct accessible icons where their meaning remains clear.
-- Until timing is editable, every chord lasts two quarter-note beats at 150 BPM (0.8 seconds). Transport timing is playback policy rather than stored chord data.
+- Until timing is editable, every chord lasts two quarter-note beats at 120 BPM (1 second). Transport timing is playback policy rather than stored chord data.
 - Starting any individual chord audition, including a candidate edit, candidate replay, or timeline chord, pauses progression playback first. Keyboard notes remain independent and do not pause it.
 - Playback snapshots the ordered entries when it starts. A paused snapshot resumes independently of later editor changes; the next stopped start captures the current progression.
 
