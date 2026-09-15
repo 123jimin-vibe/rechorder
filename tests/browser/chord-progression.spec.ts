@@ -433,18 +433,29 @@ test('progression transport plays from the beginning or selection and stops', as
     .toBe(beforeFromHere + 3);
   await stop.click();
 
+  const beforeBeginning = await page.evaluate(
+    () => window.audioProbe.sources.length,
+  );
   await play.click();
   await expect(play).toBeDisabled();
   await expect(playFromHere).toBeDisabled();
   await expect(stop).toBeEnabled();
   await expect(entries.first()).toHaveAttribute('aria-current', 'true');
-  const scheduled = await page.evaluate(() =>
-    window.audioProbe.sources.slice(-6).map((source) => source.start),
+  await expect
+    .poll(() => page.evaluate(() => window.audioProbe.sources.length))
+    .toBe(beforeBeginning + 6);
+  const scheduled = await page.evaluate(
+    (start) =>
+      window.audioProbe.sources.slice(start).map((source) => source.start),
+    beforeBeginning,
   );
   expect(scheduled.slice(0, 3).every((start) => start === scheduled[0])).toBe(
     true,
   );
-  expect(scheduled[3]! - scheduled[0]!).toBeCloseTo(0.8, 2);
+  expect(scheduled.slice(3).every((start) => start === scheduled[3])).toBe(
+    true,
+  );
+  expect(scheduled[3]! - scheduled[0]!).toBeCloseTo(1, 2);
 
   const second = entries.nth(1);
   await second.click();
