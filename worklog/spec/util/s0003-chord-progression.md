@@ -24,18 +24,25 @@ title = "Chord Progression"
 - Above the Progression timeline, a touchable C1–B6 piano keyboard highlights sounding pitches, including enharmonic equivalents and release tails. Initially show C4. Horizontal scrolling and octave shortcuts reach its keys; shortcuts also highlight sounding octaves. This range includes the lowest slash bass and highest catalogue extension. Press/hold plays a note; release, cancelled touch, lost capture or keyboard focus releases it. Support simultaneous fingers and Space/Enter. Keep a screen-reader note announcement. Keyboard notes do not edit chords and may sound alongside an audition.
 - Auditions snapshot their notes; removing/replacing their source cancels that source's audition.
 
+## Progression playback
+
+- Provide Play, Pause, and Stop beside the progression. Play starts at the beginning when stopped and resumes from the preserved position when paused. Pause silences scheduled progression sound without resetting position; Stop and natural completion reset to the beginning.
+- Until timing is editable, every chord lasts two quarter-note beats at 150 BPM (0.8 seconds). Transport timing is playback policy rather than stored chord data.
+- Starting any individual chord audition, including a candidate edit, candidate replay, or timeline chord, pauses progression playback first. Keyboard notes remain independent and do not pause it.
+- Playback snapshots the ordered entries when it starts. A paused snapshot resumes independently of later editor changes; the next stopped start captures the current progression.
+
 ## Presentation and verification
 
 - Share the playable keyboard and its self-contained key styling with s0006. Pointer drags scroll the keyboard and release their own starting note; stationary fingers may continue playing independently.
 
-- Keep the timeline the same height when empty or filled, with no vertical overflow and enough room for complete buttons plus the native scrollbar. Show no visual ordinals, count, or placeholder instructions. Put remove-last outside its horizontal scroll area; compact buttons expand to preserve complete extended/slash symbols.
+- Keep the timeline the same height when empty or filled, with no vertical overflow and enough room for complete buttons plus the native scrollbar. Show no visual ordinals, count, or placeholder instructions. Put remove-last outside its horizontal scroll area; compact buttons expand to preserve complete extended/slash symbols. Give progression items a subtle raised-button treatment by default and a pressed treatment only while that item's chord is sounding, whether from a direct tap or automatic playback; selection remains a distinct state.
 - Use compact root and bass pads (at least 36 px at default text size), preserving one-tap access to all spellings. Group root pads in aligned sharp, natural, flat rows (e.g. C♯ above C and C♭ below); preserve this alignment when zoomed. The piano is a conventional-adapter view; future temperaments may replace it without changing musical data. Keep the candidate heading and sounding-note display geometrically stable as symbols and active notes change.
 - Use concise visible action names, grouped root/type pads, and adjacent, content-width Append/Replace actions above Root. Jazz types and alterations use dense wrapping grids. Preserve focus, contrast, and touch targets with replaceable CSS variables.
 - Check empty/single/long lists, identity-preserving replacement, remove-last selection boundaries, candidate isolation, keyboard operation, rapid audition switching, and portrait overflow.
 
 ## Future — excluded
 
-- Automatic progression playback (expected soon); BPM and beat lengths.
+- Editable BPM and beat lengths.
 - Drag reordering, non-English support, chord suggestions.
 - Soundfont/articulation, musical-scale, temperament, and voicing controls.
 

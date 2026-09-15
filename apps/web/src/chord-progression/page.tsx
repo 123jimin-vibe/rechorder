@@ -16,6 +16,7 @@ import {
 } from '@rechorder/music';
 import type { WesternChord } from '@rechorder/music';
 import type { AuditionController } from '../audio/audition';
+import { useProgressionPlayback } from '../audio/use-progression-playback';
 import { useSoundingNotes } from '../audio/use-sounding-notes';
 import { editorReducer, initialEditor } from './editor';
 import { BassOptions, JazzOptions, rootPads } from './chord-options';
@@ -40,6 +41,8 @@ export function EditorPage({
       pitch.position.octave === candidate.root.position.octave,
   )?.id;
   const sounding = useSoundingNotes(controller);
+  const playback = useProgressionPlayback(controller);
+  const activeAuditionSources = new Set(controller.activeAuditionSources());
   const uniqueNotes = [
     ...new Map(
       sounding.map(({ note }) => [note.label + ':' + note.frequency, note]),
@@ -96,34 +99,71 @@ export function EditorPage({
       <section class={styles['timeline']} aria-labelledby="progression-heading">
         <div class={styles['sectionHeading']}>
           <h2 id="progression-heading">Progression</h2>
-          <button
-            type="button"
-            class={styles['backspace']}
-            aria-label="Remove last chord"
-            disabled={state.entries.length === 0}
-            onClick={() => {
-              const last = state.entries.at(-1);
-              if (last) {
-                controller.stopSource(last.id);
-                dispatch({ type: 'remove-last' });
-              }
-            }}
-          >
-            <svg
-              aria-hidden="true"
-              viewBox="0 0 24 24"
-              width="22"
-              height="22"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="1.7"
-              stroke-linecap="round"
-              stroke-linejoin="round"
+          <div class={styles['timelineActions']}>
+            <fieldset class={styles['transport']} aria-label="Playback">
+              <button
+                type="button"
+                disabled={
+                  state.entries.length === 0 || playback.status === 'playing'
+                }
+                onClick={() =>
+                  void controller.playProgression(
+                    state.entries.map((entry) => ({
+                      source: entry.id,
+                      notes: resolvePitches(
+                        voiceChord(entry.value),
+                        standardTuning,
+                      ),
+                    })),
+                  )
+                }
+              >
+                Play
+              </button>
+              <button
+                type="button"
+                disabled={playback.status !== 'playing'}
+                onClick={() => controller.pauseProgression()}
+              >
+                Pause
+              </button>
+              <button
+                type="button"
+                disabled={playback.status === 'stopped'}
+                onClick={() => controller.stopProgression()}
+              >
+                Stop
+              </button>
+            </fieldset>
+            <button
+              type="button"
+              class={styles['backspace']}
+              aria-label="Remove last chord"
+              disabled={state.entries.length === 0}
+              onClick={() => {
+                const last = state.entries.at(-1);
+                if (last) {
+                  controller.stopSource(last.id);
+                  dispatch({ type: 'remove-last' });
+                }
+              }}
             >
-              <path d="M9 5h12v14H9l-7-7Z" />
-              <path d="m12 9 6 6m0-6-6 6" />
-            </svg>
-          </button>
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+                width="22"
+                height="22"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.7"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M9 5h12v14H9l-7-7Z" />
+                <path d="m12 9 6 6m0-6-6 6" />
+              </svg>
+            </button>
+          </div>
         </div>
         <div class={styles['timelineRow']}>
           <fieldset
@@ -131,25 +171,33 @@ export function EditorPage({
             aria-label="Chord progression"
             ref={stripRef}
           >
-            {state.entries.map((entry, index) => (
-              <button
-                key={entry.id}
-                type="button"
-                class={styles['chord']}
-                data-entry-id={entry.id}
-                aria-label={`Select and play chord ${index + 1}: ${chordSymbol(entry.value)}`}
-                aria-pressed={state.selectedId === entry.id}
-                onClick={() => {
-                  dispatch({ type: 'select', id: entry.id });
-                  setCandidate(entry.value);
-                  play(entry.value, entry.id);
-                }}
-              >
-                <strong>
-                  <MusicalText text={chordSymbol(entry.value)} />
-                </strong>
-              </button>
-            ))}
+            {state.entries.map((entry, index) => {
+              const isPlaying =
+                activeAuditionSources.has(entry.id) ||
+                (playback.status === 'playing' &&
+                  playback.currentIndex === index);
+              return (
+                <button
+                  key={entry.id}
+                  type="button"
+                  class={styles['chord']}
+                  data-entry-id={entry.id}
+                  data-playing={isPlaying}
+                  aria-current={isPlaying ? 'true' : undefined}
+                  aria-label={`Select and play chord ${index + 1}: ${chordSymbol(entry.value)}`}
+                  aria-pressed={state.selectedId === entry.id}
+                  onClick={() => {
+                    dispatch({ type: 'select', id: entry.id });
+                    setCandidate(entry.value);
+                    play(entry.value, entry.id);
+                  }}
+                >
+                  <strong>
+                    <MusicalText text={chordSymbol(entry.value)} />
+                  </strong>
+                </button>
+              );
+            })}
           </fieldset>
         </div>
       </section>

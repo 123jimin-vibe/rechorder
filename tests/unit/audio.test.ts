@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createPlaybackEngine } from '@rechorder/audio';
 import { AuditionController } from '../../apps/web/src/audio/audition';
+import { progressionChordDuration } from '../../apps/web/src/audio/audition';
 import { deferred, FakeDriver } from './fake-audio';
 
 const notes = [
@@ -145,6 +146,128 @@ describe('audio scheduling engine', () => {
 });
 
 describe('page audition policy', () => {
+  it('plays, pauses, resumes, and stops a progression on the audio clock', async () => {
+    const driver = new FakeDriver();
+    const controller = new AuditionController(
+      createPlaybackEngine(() => driver),
+    );
+    const progression = [
+      { source: 'one', notes },
+      {
+        source: 'two',
+        notes: [{ key: 'new', label: 'D4', frequency: 293.66 }],
+      },
+    ];
+
+    await controller.playProgression(progression);
+    expect(progressionChordDuration).toBeCloseTo(0.8);
+    expect(controller.progressionState()).toEqual({
+      status: 'playing',
+      currentIndex: 0,
+    });
+    expect(driver.voices.map((voice) => [voice.start, voice.end])).toEqual([
+      [0, 0.8],
+      [0, 0.8],
+      [0.8, 1.6],
+    ]);
+
+    driver.advance(0.4);
+    controller.pauseProgression();
+    expect(controller.progressionState()).toEqual({
+      status: 'paused',
+      currentIndex: 0,
+    });
+    expect(driver.voices.map((voice) => voice.end)).toEqual([0.5, 0.5, 1.6]);
+    expect(driver.voices[2]?.stopped).toBe(true);
+
+    await controller.playProgression([]);
+    expect(
+      driver.voices.slice(3).map((voice) => [voice.start, voice.end]),
+    ).toEqual([
+      [0.4, 0.8],
+      [0.4, 0.8],
+      [0.8, 1.6],
+    ]);
+    driver.advance(0.5);
+    expect(controller.progressionState()).toEqual({
+      status: 'playing',
+      currentIndex: 1,
+    });
+    controller.stopProgression();
+    expect(controller.progressionState()).toEqual({
+      status: 'stopped',
+      currentIndex: null,
+    });
+
+    await controller.playProgression(progression);
+    expect(driver.voices.at(-3)?.start).toBeCloseTo(0.9);
+    controller.stopProgression();
+  });
+
+  it('pauses progression playback before starting an individual audition', async () => {
+    const driver = new FakeDriver();
+    const controller = new AuditionController(
+      createPlaybackEngine(() => driver),
+    );
+    await controller.playProgression([
+      { source: 'one', notes },
+      { source: 'two', notes },
+    ]);
+    driver.advance(0.2);
+    await controller.play(
+      [{ key: 'new', label: 'D4', frequency: 293.66 }],
+      'candidate',
+    );
+    expect(controller.progressionState()).toEqual({
+      status: 'paused',
+      currentIndex: 0,
+    });
+    expect(driver.voices.at(-1)?.start).toBeCloseTo(0.2);
+    expect(controller.notes().some((item) => item.note.label === 'D4')).toBe(
+      true,
+    );
+    controller.stopAll();
+  });
+
+  it('uses bounded lookahead and resets after natural completion', async () => {
+    const driver = new FakeDriver();
+    const controller = new AuditionController(
+      createPlaybackEngine(() => driver),
+    );
+    const progression = Array.from({ length: 20 }, (_, index) => ({
+      source: String(index),
+      notes,
+    }));
+    await controller.playProgression(progression);
+    expect(driver.voices).toHaveLength(4);
+    driver.advance(0.75);
+    controller.progressionState();
+    expect(driver.voices).toHaveLength(6);
+    controller.stopProgression();
+
+    await controller.playProgression([{ source: 'one', notes }]);
+    driver.advance(0.81);
+    expect(controller.progressionState()).toEqual({
+      status: 'stopped',
+      currentIndex: null,
+    });
+  });
+
+  it('reports a progression scheduling failure and resets the transport', async () => {
+    const driver = new FakeDriver();
+    const report = vi.fn<(error: unknown) => void>();
+    const controller = new AuditionController(
+      createPlaybackEngine(() => driver),
+      report,
+    );
+    await controller.playProgression([{ source: 'invalid', notes: [] }]);
+    expect(report).toHaveBeenCalledOnce();
+    expect(controller.progressionState()).toEqual({
+      status: 'stopped',
+      currentIndex: null,
+    });
+  });
+
   it('owns independent held notes and suppresses released pending gestures', async () => {
     const driver = new FakeDriver();
     const ready = deferred();
@@ -246,16 +369,20 @@ describe('page audition policy', () => {
       createPlaybackEngine(() => driver),
     );
     await controller.play(notes, 'entry');
+    expect(controller.activeAuditionSources()).toEqual(['entry']);
     driver.advance(0.2);
     await controller.play(
       [{ key: 'x', label: 'A3', frequency: 220 }],
       'candidate',
     );
+    expect(controller.activeAuditionSources()).toEqual(['entry', 'candidate']);
     driver.advance(0.11);
     expect(controller.notes().map((item) => item.note.label)).toEqual(['A3']);
+    expect(controller.activeAuditionSources()).toEqual(['candidate']);
     controller.stopSource('candidate');
     driver.advance(0.11);
     expect(controller.notes()).toEqual([]);
+    expect(controller.activeAuditionSources()).toEqual([]);
   });
 
   it('reports errors and permits retry; disposal prevents late scheduling', async () => {

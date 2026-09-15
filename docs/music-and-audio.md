@@ -13,7 +13,7 @@
 | `@rechorder/music`                           | Plain musical data, voicing/tuning resolution, immutable insert/replace/remove/move |
 | `@rechorder/audio`                           | Audio-clock scheduling, cancellation, sounding-note snapshots, voice cleanup        |
 | `apps/web/src/chord-progression/editor.ts`   | Pure editor reducer; append, replace selected, remove last, stable selection        |
-| `apps/web/src/audio/audition.ts`             | Latest-request policy, one audition with release tails, console error reporting     |
+| `apps/web/src/audio/audition.ts`             | Audition policy, progression transport, release tails, console error reporting      |
 | `apps/web/src/components/piano-keyboard.tsx` | Shared playable conventional keyboard; each instance owns its scroll viewport       |
 | `apps/web/src/components/rotatable-view.tsx` | Reusable 90-degree utility viewport and toggle                                      |
 | `apps/web/src/chord-progression/main.tsx`    | Service composition, page visibility and disposal                                   |
@@ -92,6 +92,14 @@ pending request. Hidden pages stop immediately; leaving disposes audio except wh
 the browser preserves the page in its back/forward cache. Errors go to `console.error`;
 the controller's reporting callback can later show a snackbar.
 
+The progression transport snapshots entries on a stopped start and currently assigns
+each one two quarter-note beats at 150 BPM (0.8 seconds). It maintains a bounded
+lookahead, but every voice uses an audio-clock start so JavaScript timer jitter does not
+move chord boundaries. Pause cancels scheduled handles and retains the exact elapsed
+offset; Play schedules the remaining part of the current chord and resumes the snapshot.
+Stop and natural completion reset to the beginning. Any one-chord audition pauses the
+transport first, while held keyboard notes remain independent.
+
 Keyboard presses use independent handles at one-quarter level, up to ten held gestures.
 They can sound alongside the chord audition, sustain for up to four seconds, and release
 on pointer/key up, cancellation, lost capture or keyboard blur. Pending gestures are
@@ -106,14 +114,12 @@ gestures because [browser panning may suppress concurrent pointers](https://www.
 
 ## Near-term extensions
 
-- **Sequencing:** add a transport that owns scheduling and playback handles. Translate
-  exact whole-note fractions through a separate tempo map to audio-clock seconds.
-  Keep meter separate; tuplets and complex beats must not be rounded to a fixed grid.
-  Today's progression is untimed, so no placeholder beat fields or tempo state exist.
+- **Editable timing:** replace the transport defaults with exact whole-note fractions
+  translated through a separate tempo map to audio-clock seconds. Keep meter separate;
+  tuplets and complex beats must not be rounded to a fixed grid. Progression entries
+  remain untimed until those controls and musical fields are introduced.
 - **Tuning and voicing:** resolve another musical adapter before scheduling. Audio
   accepts continuous frequencies below the backend's Nyquist limit and within its
   documented delay-allocation bound; tuning is never quantized to MIDI notes.
 - **Instruments and articulation:** replace/extend the audio driver without changing
   progression editing or pitch identities. Backend voices own their resources.
-
-Automatic progression playback and these controls remain future work under s0003.

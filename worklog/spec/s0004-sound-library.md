@@ -10,7 +10,7 @@ title = "Sound Library"
 - Follow s0002: support atypical temperaments and complex beats without coupling musical data to a sound backend or UI.
 - The application owns sound-service creation and disposal; components invoke its interface.
 - Separate musical interpretation from sound generation, and editable data from playback state.
-- Allow future sequencing to control sound independently of UI rendering. Automatic progression playback is expected soon, but excluded from t0002.
+- Allow sequencing to control sound independently of UI rendering.
 - Use the audio clock for sound scheduling; UI timers may refresh display only.
 
 ## Required in t0002
@@ -25,6 +25,7 @@ Provide reusable individual-chord playback for candidate and list-item actions i
 - Bound the backend to 64 live/scheduled notes (two players each) and 65,536 samples of nominal round-trip delay per player. Reject unsupported allocations before scheduling. The model supports native rates from 8–192 kHz, frequencies below native Nyquist and above the delay-allocation bound; C1–B6 and intermediate frequencies are the required tuning-test range.
 - The playback contract accepts resolved notes, audio-clock start time, duration and optional normalized level, and returns a cancellable handle with stable playback ID and lifecycle state.
 - One chord audition is active across the page. A new request starts immediately at the current audio time, without awaiting the previous chord, its release, or reinitialization of running audio. It releases the previous audition concurrently; the application applies this policy while the sound contract remains independently cancellable for future sequencing.
+- Progression transport schedules a bounded lookahead against the audio clock so an unbounded progression does not reserve unbounded voices. Pause cancels its scheduled handles and records its exact musical offset; resume schedules the remainder from that offset. Stop and natural completion reset it. An individual chord audition pauses the transport before it starts.
 - Keyboard gestures own independent cancellable voices, capped at ten concurrent held inputs with conservative fixed gain. Held strings sustain for up to four seconds; releasing a gesture releases its voice. A release while audio initializes prevents a late note. Hidden-page stop/disposal also clears held inputs.
 - Report active notes and scheduled start/end through the playback lifecycle, including release. The note display follows that state.
 - Create/resume audio only from a musical user gesture. The application owns disposal, stops sound on page hidden, and the latest chord request wins while initialization is pending.

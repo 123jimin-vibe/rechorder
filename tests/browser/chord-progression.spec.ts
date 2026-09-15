@@ -346,6 +346,93 @@ test('timeline and type choices immediately replace a sounding audition', async 
     .toBe(count + 3);
 });
 
+test('progression items are raised by default and pressed only while sounding', async ({
+  page,
+}) => {
+  await page.addInitScript(installAudioProbe);
+  await page.goto('./chord-progression/');
+  await page.getByRole('button', { name: 'Append', exact: true }).click();
+  const chord = page.locator('[data-entry-id]').first();
+  const appearance = () =>
+    chord.evaluate((element) => ({
+      shadow: getComputedStyle(element).boxShadow,
+      transform: getComputedStyle(element).transform,
+    }));
+  const raised = await appearance();
+  expect(raised.shadow).not.toBe('none');
+  await expect(chord).toHaveAttribute('data-playing', 'false');
+
+  await chord.click();
+  await expect(chord).toHaveAttribute('data-playing', 'true');
+  await page.waitForTimeout(100);
+  const directlyPressed = await appearance();
+  expect(directlyPressed.shadow).not.toBe(raised.shadow);
+  expect(directlyPressed.transform).not.toBe(raised.transform);
+  await expect(chord).toHaveAttribute('data-playing', 'false', {
+    timeout: 1_500,
+  });
+
+  await page.getByRole('button', { name: 'Play', exact: true }).click();
+  await expect(chord).toHaveAttribute('data-playing', 'true');
+  await page.waitForTimeout(100);
+  expect(await appearance()).toEqual(directlyPressed);
+  await expect(chord).toHaveAttribute('data-playing', 'false', {
+    timeout: 1_500,
+  });
+});
+
+test('progression transport plays at 150 BPM, pauses, resumes, and stops', async ({
+  page,
+}) => {
+  await page.addInitScript(installAudioProbe);
+  await page.goto('./chord-progression/');
+  const play = page.getByRole('button', { name: 'Play', exact: true });
+  const pause = page.getByRole('button', { name: 'Pause', exact: true });
+  const stop = page.getByRole('button', { name: 'Stop', exact: true });
+  await expect(play).toBeDisabled();
+  await expect(pause).toBeDisabled();
+  await expect(stop).toBeDisabled();
+
+  await page.getByRole('button', { name: 'Append', exact: true }).click();
+  await page.getByRole('button', { name: 'Root D', exact: true }).click();
+  await page.getByRole('button', { name: 'Append', exact: true }).click();
+  await play.click();
+  await expect(play).toBeDisabled();
+  await expect(pause).toBeEnabled();
+  await expect(stop).toBeEnabled();
+  await expect(page.locator('[data-entry-id]').first()).toHaveAttribute(
+    'aria-current',
+    'true',
+  );
+  const scheduled = await page.evaluate(() =>
+    window.audioProbe.sources.slice(-6).map((source) => source.start),
+  );
+  expect(scheduled.slice(0, 3).every((start) => start === scheduled[0])).toBe(
+    true,
+  );
+  expect(scheduled[3]! - scheduled[0]!).toBeCloseTo(0.8, 2);
+
+  await pause.click();
+  await expect(play).toBeEnabled();
+  await expect(pause).toBeDisabled();
+  await expect(stop).toBeEnabled();
+  await play.click();
+  await expect(pause).toBeEnabled();
+
+  const second = page.locator('[data-entry-id]').nth(1);
+  await second.click();
+  await expect(play).toBeEnabled();
+  await expect(pause).toBeDisabled();
+  await expect(stop).toBeEnabled();
+  await expect(second).toHaveAttribute('data-playing', 'true');
+  await expect(second).toHaveAttribute('aria-current', 'true');
+  await expect(page.getByLabel('Currently playing notes')).toHaveText(
+    'D4F♯4A4',
+  );
+  await stop.click();
+  await expect(stop).toBeDisabled();
+});
+
 test('compact long progressions scroll and controls remain keyboard operable', async ({
   page,
 }, testInfo) => {
