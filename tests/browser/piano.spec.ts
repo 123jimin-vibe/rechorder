@@ -47,6 +47,17 @@ for (const turn of [0, 1, 2, 3]) {
     const dragged = lower.getByRole('button', { name: 'Play G4', exact: true });
     const initialUpper = await upper.evaluate((element) => element.scrollLeft);
     const initialLower = await lower.evaluate((element) => element.scrollLeft);
+    await lower.evaluate((element) =>
+      element.addEventListener(
+        'pointerdown',
+        (event) => {
+          element.dataset['lastTouchPointer'] = String(
+            (event as PointerEvent).pointerId,
+          );
+        },
+        { capture: true },
+      ),
+    );
     const first = { id: 11, ...(await keyPoint(held, turn)) };
     const second = { id: 12, ...(await keyPoint(dragged, turn)) };
     const input = await page.context().newCDPSession(page);
@@ -60,6 +71,19 @@ for (const turn of [0, 1, 2, 3]) {
     });
     await expect(held).toHaveAttribute('aria-pressed', 'true');
     await expect(dragged).toHaveAttribute('aria-pressed', 'true');
+    if (await page.evaluate(() => navigator.maxTouchPoints > 0)) {
+      const pointerId = Number(
+        await lower.getAttribute('data-last-touch-pointer'),
+      );
+      await lower.dispatchEvent('pointercancel', {
+        bubbles: true,
+        pointerId,
+        pointerType: 'touch',
+        clientX: second.x,
+        clientY: second.y,
+      });
+      await expect(dragged).toHaveAttribute('aria-pressed', 'true');
+    }
 
     const axis = [
       [1, 0],
@@ -113,6 +137,91 @@ for (const turn of [0, 1, 2, 3]) {
     });
   });
 }
+
+test('touch contacts keep independent note and scrolling lifecycles', async ({
+  page,
+  browserName,
+}) => {
+  test.skip(browserName !== 'chromium', 'Uses constructed touch input.');
+  await page.addInitScript(installAudioProbe);
+  await page.goto('./piano/');
+  test.skip(
+    (await page.evaluate(() => navigator.maxTouchPoints)) === 0,
+    'Requires a touch-enabled browser context.',
+  );
+  const row = page.locator('[data-keyboard-scroll="piano:upper"]');
+  const held = row.getByRole('button', { name: 'Play C4', exact: true });
+  const dragged = row.getByRole('button', { name: 'Play G4', exact: true });
+  const heldPoint = await keyPoint(held, 0);
+  const draggedPoint = await keyPoint(dragged, 0);
+  const before = await row.evaluate((element) => element.scrollLeft);
+
+  await page.evaluate(
+    ({ heldPoint, draggedPoint }) => {
+      const held = document.querySelector<HTMLElement>(
+        '[data-keyboard-scroll="piano:upper"] [aria-label="Play C4"]',
+      )!;
+      const dragged = document.querySelector<HTMLElement>(
+        '[data-keyboard-scroll="piano:upper"] [aria-label="Play G4"]',
+      )!;
+      const contact = (
+        identifier: number,
+        target: EventTarget,
+        point: { x: number; y: number },
+      ) =>
+        new Touch({
+          identifier,
+          target,
+          clientX: point.x,
+          clientY: point.y,
+        });
+      const send = (
+        target: HTMLElement,
+        type: string,
+        touches: Touch[],
+        changedTouches: Touch[],
+      ) =>
+        target.dispatchEvent(
+          new TouchEvent(type, {
+            bubbles: true,
+            cancelable: true,
+            touches,
+            targetTouches: touches.filter((touch) => touch.target === target),
+            changedTouches,
+          }),
+        );
+
+      const first = contact(31, held, heldPoint);
+      const second = contact(32, dragged, draggedPoint);
+      send(held, 'touchstart', [first], [first]);
+      send(dragged, 'touchstart', [first, second], [second]);
+      for (const distance of [20, 40, 60, 80]) {
+        const moved = contact(32, dragged, {
+          x: draggedPoint.x - distance,
+          y: draggedPoint.y,
+        });
+        send(dragged, 'touchmove', [first, moved], [moved]);
+      }
+      send(dragged, 'touchcancel', [first], [second]);
+      (
+        window as typeof window & { finishHeldTouch: () => void }
+      ).finishHeldTouch = () => send(held, 'touchend', [], [first]);
+    },
+    { heldPoint, draggedPoint },
+  );
+
+  await expect
+    .poll(() => row.evaluate((element) => element.scrollLeft))
+    .toBeGreaterThan(before + 70);
+  await expect(dragged).toHaveAttribute('aria-pressed', 'false');
+  await expect(held).toHaveAttribute('aria-pressed', 'true');
+  await page.evaluate(() =>
+    (
+      window as typeof window & { finishHeldTouch: () => void }
+    ).finishHeldTouch(),
+  );
+  await expect(held).toHaveAttribute('aria-pressed', 'false');
+});
 
 test('mouse dragging scrolls without releasing the starting key', async ({
   page,

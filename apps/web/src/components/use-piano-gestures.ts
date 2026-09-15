@@ -5,26 +5,32 @@ import type { PianoPlayer } from './piano-keyboard';
 import { inlineMovement, ViewOrientation } from './view-orientation';
 
 interface Gesture {
+  readonly clientX: number;
+  readonly clientY: number;
   readonly start: number;
   readonly scroll: number;
+  readonly source: string;
+  readonly touchCompatible: boolean;
   dragging: boolean;
 }
 
-/** Each pointer owns a note or a drag; browser-wide touch panning cannot do both. */
+type ContactKind = 'pointer' | 'touch';
+
+/** Each mouse, pen, or touch contact owns its note and drag lifecycle. */
 export function usePianoGestures(
   viewport: RefObject<HTMLDivElement>,
   controller: PianoPlayer,
   sourceId: string,
 ) {
   const turn = useContext(ViewOrientation);
-  const gestures = useRef(new Map<number, Gesture>());
-  const source = (id: number) => `${sourceId}:pointer:${id}`;
+  const gestures = useRef(new Map<string, Gesture>());
+  const contactId = (kind: ContactKind, id: number) => `${kind}:${id}`;
+  const source = (kind: ContactKind, id: number) => `${sourceId}:${kind}:${id}`;
 
   useEffect(() => {
     const active = gestures.current;
     const clear = () => {
-      for (const id of active.keys())
-        controller.release(`${sourceId}:pointer:${id}`);
+      for (const gesture of active.values()) controller.release(gesture.source);
       active.clear();
     };
     const visibility = () => {
@@ -68,31 +74,37 @@ export function usePianoGestures(
     return () => element.removeEventListener('wheel', wheel);
   }, [viewport, turn]);
 
-  function start(event: PointerEvent, note?: ResolvedNote) {
+  function start(
+    kind: ContactKind,
+    id: number,
+    clientX: number,
+    clientY: number,
+    note?: ResolvedNote,
+    touchCompatible = false,
+  ) {
     const element = viewport.current;
-    if (!element || event.button !== 0 || gestures.current.has(event.pointerId))
-      return;
-    // Touch/pen input owns its press state; do not let a compatibility click
-    // focus the native button or add a platform tap rectangle.
-    if (note && (event.pointerType === 'touch' || event.pointerType === 'pen'))
-      event.preventDefault();
-    element.setPointerCapture(event.pointerId);
-    gestures.current.set(event.pointerId, {
-      start: inlineMovement(event.clientX, event.clientY, turn),
+    const key = contactId(kind, id);
+    if (!element || gestures.current.has(key)) return;
+    const gesture = {
+      clientX,
+      clientY,
+      start: inlineMovement(clientX, clientY, turn),
       scroll: element.scrollLeft,
+      source: source(kind, id),
+      touchCompatible,
       dragging: false,
-    });
-    if (note) void controller.press(source(event.pointerId), note);
+    };
+    gestures.current.set(key, gesture);
+    if (note) void controller.press(gesture.source, note);
   }
 
-  function move(event: PointerEvent) {
+  function move(kind: ContactKind, id: number, position: number) {
     const element = viewport.current;
-    const gesture = gestures.current.get(event.pointerId);
+    const gesture = gestures.current.get(contactId(kind, id));
     if (!element || !gesture) return;
-    const delta =
-      inlineMovement(event.clientX, event.clientY, turn) - gesture.start;
+    const delta = position - gesture.start;
     if (!gesture.dragging && Math.abs(delta) >= 8) {
-      // One scrolling pointer per row; other pointers retain their note ownership.
+      // One scrolling contact per row; other contacts retain their note ownership.
       if ([...gestures.current.values()].some((value) => value.dragging))
         return;
       gesture.dragging = true;
@@ -100,10 +112,92 @@ export function usePianoGestures(
     if (gesture.dragging) element.scrollTo({ left: gesture.scroll - delta });
   }
 
-  function end(event: PointerEvent) {
-    if (!gestures.current.delete(event.pointerId)) return;
-    controller.release(source(event.pointerId));
+  function end(kind: ContactKind, id: number) {
+    const key = contactId(kind, id);
+    const gesture = gestures.current.get(key);
+    if (!gesture) return;
+    gestures.current.delete(key);
+    controller.release(gesture.source);
   }
 
-  return { start, move, end };
+  function pointerStart(event: PointerEvent, note?: ResolvedNote) {
+    if (
+      event.button !== 0 ||
+      gestures.current.has(contactId('pointer', event.pointerId))
+    )
+      return;
+    if (note && event.pointerType === 'pen') event.preventDefault();
+    const element = viewport.current;
+    if (!element) return;
+    element.setPointerCapture(event.pointerId);
+    start(
+      'pointer',
+      event.pointerId,
+      event.clientX,
+      event.clientY,
+      note,
+      event.pointerType === 'touch',
+    );
+  }
+
+  function pointerMove(event: PointerEvent) {
+    move(
+      'pointer',
+      event.pointerId,
+      inlineMovement(event.clientX, event.clientY, turn),
+    );
+  }
+
+  function pointerEnd(event: PointerEvent) {
+    end('pointer', event.pointerId);
+  }
+
+  function touchStart(event: TouchEvent, note?: ResolvedNote) {
+    // The keyboard owns touch panning. Prevent compatibility mouse events from
+    // focusing keys or starting a second gesture lifecycle.
+    event.preventDefault();
+    for (const touch of event.changedTouches) {
+      const key = contactId('touch', touch.identifier);
+      if (gestures.current.has(key)) continue;
+      // Pointer-capable browsers dispatch pointerdown before touchstart. Move
+      // that same contact to touch ownership without restarting its note, so a
+      // later pointercancel from panning cannot terminate the touch hold.
+      const pointer = [...gestures.current.entries()].find(
+        ([candidate, gesture]) =>
+          candidate.startsWith('pointer:') &&
+          gesture.touchCompatible &&
+          Math.abs(gesture.clientX - touch.clientX) <= 1 &&
+          Math.abs(gesture.clientY - touch.clientY) <= 1,
+      );
+      if (pointer) {
+        gestures.current.delete(pointer[0]);
+        gestures.current.set(key, pointer[1]);
+        continue;
+      }
+      start('touch', touch.identifier, touch.clientX, touch.clientY, note);
+    }
+  }
+
+  function touchMove(event: TouchEvent) {
+    event.preventDefault();
+    for (const touch of event.changedTouches)
+      move(
+        'touch',
+        touch.identifier,
+        inlineMovement(touch.clientX, touch.clientY, turn),
+      );
+  }
+
+  function touchEnd(event: TouchEvent) {
+    for (const touch of event.changedTouches) end('touch', touch.identifier);
+  }
+
+  return {
+    pointerStart,
+    pointerMove,
+    pointerEnd,
+    touchStart,
+    touchMove,
+    touchEnd,
+  };
 }

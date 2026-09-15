@@ -106,15 +106,18 @@ while held keyboard notes remain independent.
 Keyboard presses use independent handles at one-quarter level, up to ten held gestures.
 They can sound alongside the chord audition, sustain until release (with a one-day backend
 safety bound), and release on pointer/key up, cancellation, lost capture, keyboard blur,
-or window focus loss. Pending gestures are
+touch end/cancellation, or window focus loss. Pending gestures are
 identity-checked after audio resume so a released finger cannot produce a late note.
-The shared keyboard owns its key styling and sounding-key press feedback, pointer capture,
-per-finger dragging, optional octave shortcuts and single-lifecycle Space/Enter support;
+The shared keyboard owns its key styling and sounding-key press feedback, input-contact
+tracking, optional octave shortcuts and single-lifecycle Space/Enter support. Mouse and pen
+gestures use pointer capture. A touch contact takes over its compatibility pointer's existing
+gesture and audio source, then follows `changedTouches` until that contact ends or cancels;
+pointer cancellation during touch panning therefore neither releases nor restarts its note.
 touch/pen presses suppress native focus and tap rectangles while keyboard focus remains
 visible, and screen readers retain spelled-note announcements. The chord utility hides the optional shortcuts.
 The free Piano page mounts two instances with separate scroll positions and input source IDs.
-Dragging retains that pointer's starting note while scrolling; pointer end or cancellation
-releases it, and stationary fingers keep playing. The
+Dragging retains that contact's starting note while scrolling; its own end or cancellation
+releases it without affecting other contacts, and stationary fingers keep playing. The
 rotatable viewport provides an orientation context so touch drags and wheel input follow
 the keyboard's inline axis through all four orientations. Keyboard surfaces own their touch
 gestures because [browser panning may suppress concurrent pointers](https://www.w3.org/TR/pointerevents3/#the-touch-action-css-property).

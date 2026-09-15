@@ -98,16 +98,20 @@ export function PianoKeyboard({
         ref={viewport}
         class={styles['viewport']}
         data-keyboard-scroll={sourceId}
-        onPointerMove={gestures.move}
-        onPointerUp={gestures.end}
-        onPointerCancel={gestures.end}
-        onLostPointerCapture={gestures.end}
+        onPointerMove={gestures.pointerMove}
+        onPointerUp={gestures.pointerEnd}
+        onPointerCancel={gestures.pointerEnd}
+        onLostPointerCapture={gestures.pointerEnd}
+        onTouchMove={gestures.touchMove}
+        onTouchEnd={gestures.touchEnd}
+        onTouchCancel={gestures.touchEnd}
         onContextMenu={(event) => event.preventDefault()}
       >
         <fieldset
           class={styles['keys']}
           aria-label={label}
-          onPointerDown={(event) => gestures.start(event)}
+          onPointerDown={(event) => gestures.pointerStart(event)}
+          onTouchStart={(event) => gestures.touchStart(event)}
         >
           {keys.map(({ pitch, note }) => {
             const black = pitch.position.accidental !== 0;
@@ -129,7 +133,8 @@ export function PianoKeyboard({
                 }
                 aria-label={`Play ${note.label}`}
                 aria-pressed={sounding}
-                onPointerDown={(event) => gestures.start(event, note)}
+                onPointerDown={(event) => gestures.pointerStart(event, note)}
+                onTouchStart={(event) => gestures.touchStart(event, note)}
                 onKeyDown={(event) => {
                   if (event.key === ' ' || event.key === 'Enter') {
                     event.preventDefault();
