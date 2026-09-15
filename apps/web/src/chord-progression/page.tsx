@@ -75,6 +75,13 @@ export function EditorPage({
     play(chord, 'candidate');
   }
 
+  function progressionChords() {
+    return state.entries.map((entry) => ({
+      source: entry.id,
+      notes: resolvePitches(voiceChord(entry.value), standardTuning),
+    }));
+  }
+
   return (
     <main class={styles['shell']}>
       <header class={styles['header']}>
@@ -93,7 +100,11 @@ export function EditorPage({
           />
           Now playing
         </h2>
-        <PianoKeyboard controller={controller} notes={uniqueNotes} />
+        <PianoKeyboard
+          controller={controller}
+          notes={uniqueNotes}
+          showOctaveShortcuts={false}
+        />
       </section>
 
       <section class={styles['timeline']} aria-labelledby="progression-heading">
@@ -106,39 +117,53 @@ export function EditorPage({
                 disabled={
                   state.entries.length === 0 || playback.status === 'playing'
                 }
+                aria-label="Play"
+                title="Play"
                 onClick={() =>
-                  void controller.playProgression(
-                    state.entries.map((entry) => ({
-                      source: entry.id,
-                      notes: resolvePitches(
-                        voiceChord(entry.value),
-                        standardTuning,
-                      ),
-                    })),
-                  )
+                  void controller.playProgression(progressionChords())
                 }
               >
-                Play
+                <svg aria-hidden="true" viewBox="0 0 24 24">
+                  <path d="m8 5 11 7-11 7Z" />
+                </svg>
               </button>
               <button
                 type="button"
-                disabled={playback.status !== 'playing'}
-                onClick={() => controller.pauseProgression()}
+                disabled={!selected || playback.status === 'playing'}
+                aria-label="Play from here"
+                title="Play from here"
+                onClick={() => {
+                  const index = state.entries.findIndex(
+                    (entry) => entry.id === selected?.id,
+                  );
+                  if (index >= 0) {
+                    controller.stopProgression();
+                    void controller.playProgression(progressionChords(), index);
+                  }
+                }}
               >
-                Pause
+                <svg aria-hidden="true" viewBox="0 0 24 24">
+                  <path d="M5 4v16" />
+                  <path d="m9 5 11 7-11 7Z" />
+                </svg>
               </button>
               <button
                 type="button"
                 disabled={playback.status === 'stopped'}
+                aria-label="Stop"
+                title="Stop"
                 onClick={() => controller.stopProgression()}
               >
-                Stop
+                <svg aria-hidden="true" viewBox="0 0 24 24">
+                  <rect x="6" y="6" width="12" height="12" rx="1" />
+                </svg>
               </button>
             </fieldset>
             <button
               type="button"
               class={styles['backspace']}
               aria-label="Remove last chord"
+              title="Remove last chord"
               disabled={state.entries.length === 0}
               onClick={() => {
                 const last = state.entries.at(-1);
@@ -151,8 +176,8 @@ export function EditorPage({
               <svg
                 aria-hidden="true"
                 viewBox="0 0 24 24"
-                width="22"
-                height="22"
+                width="18"
+                height="18"
                 fill="none"
                 stroke="currentColor"
                 stroke-width="1.7"

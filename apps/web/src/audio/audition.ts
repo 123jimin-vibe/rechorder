@@ -99,17 +99,26 @@ export class AuditionController {
       .map(({ source }) => source);
   }
 
-  async playProgression(chords: readonly ProgressionChord[]): Promise<void> {
+  async playProgression(
+    chords: readonly ProgressionChord[],
+    startIndex = 0,
+  ): Promise<void> {
     if (this.disposed || this.progression?.status === 'playing') return;
     if (!this.progression || this.progression.status === 'stopped') {
       if (chords.length === 0) return;
+      if (
+        !Number.isInteger(startIndex) ||
+        startIndex < 0 ||
+        startIndex >= chords.length
+      )
+        throw new RangeError('Progression start index does not exist.');
       this.progression = {
         chords: chords.map((chord) => ({
           source: chord.source,
           notes: chord.notes.map((note) => ({ ...note })),
         })),
         status: 'stopped',
-        offset: 0,
+        offset: startIndex * progressionChordDuration,
         origin: null,
         nextIndex: 0,
       };

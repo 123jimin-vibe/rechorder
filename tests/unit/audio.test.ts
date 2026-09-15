@@ -199,8 +199,16 @@ describe('page audition policy', () => {
       currentIndex: null,
     });
 
-    await controller.playProgression(progression);
-    expect(driver.voices.at(-3)?.start).toBeCloseTo(0.9);
+    const before = driver.voices.length;
+    await controller.playProgression(progression, 1);
+    expect(controller.progressionState()).toEqual({
+      status: 'playing',
+      currentIndex: 1,
+    });
+    const fromSecond = driver.voices.slice(before);
+    expect(fromSecond).toHaveLength(1);
+    expect(fromSecond[0]?.start).toBeCloseTo(0.9);
+    expect(fromSecond[0]?.end).toBeCloseTo(1.7);
     controller.stopProgression();
   });
 
@@ -266,6 +274,9 @@ describe('page audition policy', () => {
       status: 'stopped',
       currentIndex: null,
     });
+    await expect(
+      controller.playProgression([{ source: 'one', notes }], 1),
+    ).rejects.toThrow('start index');
   });
 
   it('owns independent held notes and suppresses released pending gestures', async () => {

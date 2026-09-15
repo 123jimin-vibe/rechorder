@@ -64,6 +64,11 @@
   align-items: end;
   justify-content: center;
   padding-block-end: 0.5rem;
+  transform: translateY(-1px);
+  transition:
+    transform 70ms ease,
+    box-shadow 70ms ease,
+    background-color 70ms ease;
 }
 .keys .white {
   flex: 0 0 2.875rem;
@@ -71,7 +76,9 @@
   block-size: 8rem;
   background: var(--surface);
   color: var(--text);
-  box-shadow: inset 0 -3px 0 var(--border);
+  box-shadow:
+    inset 0 -3px 0 var(--border),
+    0 2px 3px var(--shadow);
 }
 .fill .keys .white {
   block-size: 100%;
@@ -86,6 +93,7 @@
   color: var(--surface);
   border-color: var(--text);
   font-size: 0.6875rem;
+  box-shadow: 0 3px 4px var(--shadow);
 }
 .fill .keys .black {
   block-size: 62%;
@@ -94,7 +102,8 @@
   background: var(--accent);
   color: var(--on-accent);
   border-color: var(--accent);
-  box-shadow: inset 0 -3px 0 var(--accent-hover);
+  transform: translateY(2px);
+  box-shadow: inset 0 2px 4px var(--accent-hover);
 }
 .keys button:focus-visible {
   z-index: 2;

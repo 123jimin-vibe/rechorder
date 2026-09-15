@@ -12,6 +12,10 @@
   --accent-hover: #105443;
   --accent-soft: #e8f3ed;
   --on-accent: #ffffff;
+  --danger: #b42318;
+  --danger-hover: #912018;
+  --danger-soft: #fef3f2;
+  --danger-border: #fecdca;
   --shadow: #22353108;
   --focus: var(--accent);
   color: var(--text);

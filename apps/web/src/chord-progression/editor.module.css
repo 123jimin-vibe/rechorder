@@ -106,10 +106,20 @@
   min-inline-size: 0;
 }
 .shell .transport button {
+  inline-size: 2.25rem;
   min-block-size: 2.25rem;
-  padding: 0.25rem 0.5rem;
-  font-size: 0.8125rem;
-  font-weight: 600;
+  display: grid;
+  place-items: center;
+  padding: 0.25rem;
+  & svg {
+    inline-size: 1.125rem;
+    block-size: 1.125rem;
+    fill: currentColor;
+    stroke: currentColor;
+    stroke-width: 1.75;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
 }
 .timelineRow {
   min-inline-size: 0;
@@ -159,9 +169,23 @@
     0 0.25rem 0.5rem var(--shadow);
 }
 .shell .backspace {
-  inline-size: 2.75rem;
+  inline-size: 2.25rem;
+  min-block-size: 2.25rem;
   display: grid;
   place-items: center;
+  padding: 0.25rem;
+  &:not(:disabled) {
+    color: var(--danger);
+    background: var(--danger-soft);
+    border-color: var(--danger-border);
+  }
+  @media (hover: hover) {
+    &:not(:disabled):hover {
+      color: var(--danger-hover);
+      border-color: var(--danger);
+      background: var(--danger-soft);
+    }
+  }
 }
 .composer {
   container-type: inline-size;

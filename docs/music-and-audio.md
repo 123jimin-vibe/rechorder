@@ -97,15 +97,17 @@ each one two quarter-note beats at 150 BPM (0.8 seconds). It maintains a bounded
 lookahead, but every voice uses an audio-clock start so JavaScript timer jitter does not
 move chord boundaries. Pause cancels scheduled handles and retains the exact elapsed
 offset; Play schedules the remaining part of the current chord and resumes the snapshot.
-Stop and natural completion reset to the beginning. Any one-chord audition pauses the
-transport first, while held keyboard notes remain independent.
+Play from here replaces that session and starts at the selected entry. Stop and natural
+completion reset to the beginning. Any one-chord audition pauses the transport first,
+while held keyboard notes remain independent.
 
 Keyboard presses use independent handles at one-quarter level, up to ten held gestures.
 They can sound alongside the chord audition, sustain for up to four seconds, and release
 on pointer/key up, cancellation, lost capture or keyboard blur. Pending gestures are
 identity-checked after audio resume so a released finger cannot produce a late note.
-The shared keyboard owns its key styling, pointer capture, per-finger dragging, optional
-octave shortcuts and Space/Enter support; screen readers retain spelled-note announcements.
+The shared keyboard owns its key styling and sounding-key press feedback, pointer capture,
+per-finger dragging, optional octave shortcuts and Space/Enter support; screen readers
+retain spelled-note announcements. The chord utility hides the optional shortcuts.
 The free Piano page mounts two instances with separate scroll positions and input source IDs.
 Dragging releases that finger's starting note while stationary fingers keep playing. The
 rotatable viewport provides an orientation context so touch drags and wheel input follow

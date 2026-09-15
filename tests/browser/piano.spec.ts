@@ -152,6 +152,8 @@ test('both utilities share complete key styling and keyboard controls', async ({
         radius: style.borderRadius,
         font: style.font,
         touchAction: style.touchAction,
+        shadow: style.boxShadow,
+        transform: style.transform,
       };
     });
   await page.goto('./chord-progression/');
@@ -173,6 +175,24 @@ test('both utilities share complete key styling and keyboard controls', async ({
   await key.focus();
   await page.keyboard.down('Space');
   await expect(key).toHaveAttribute('aria-pressed', 'true');
+  await page.waitForTimeout(100);
+  const pressed = await keyStyle(key);
+  expect(pressed.shadow).not.toBe(white.shadow);
+  expect(pressed.transform).not.toBe(white.transform);
   await page.keyboard.up('Space');
   await expect(key).toHaveAttribute('aria-pressed', 'false');
+
+  const blackKey = piano.getByRole('button', {
+    name: 'Play C♯4',
+    exact: true,
+  });
+  await blackKey.focus();
+  await page.keyboard.down('Space');
+  await expect(blackKey).toHaveAttribute('aria-pressed', 'true');
+  await page.waitForTimeout(100);
+  const blackPressed = await keyStyle(blackKey);
+  expect(blackPressed.shadow).not.toBe(black.shadow);
+  expect(blackPressed.transform).not.toBe(black.transform);
+  await page.keyboard.up('Space');
+  await expect(blackKey).toHaveAttribute('aria-pressed', 'false');
 });

@@ -381,29 +381,67 @@ test('progression items are raised by default and pressed only while sounding', 
   });
 });
 
-test('progression transport plays at 150 BPM, pauses, resumes, and stops', async ({
+test('progression transport plays from the beginning or selection and stops', async ({
   page,
 }) => {
   await page.addInitScript(installAudioProbe);
   await page.goto('./chord-progression/');
   const play = page.getByRole('button', { name: 'Play', exact: true });
-  const pause = page.getByRole('button', { name: 'Pause', exact: true });
+  const playFromHere = page.getByRole('button', {
+    name: 'Play from here',
+    exact: true,
+  });
   const stop = page.getByRole('button', { name: 'Stop', exact: true });
+  const remove = page.getByRole('button', {
+    name: 'Remove last chord',
+    exact: true,
+  });
   await expect(play).toBeDisabled();
-  await expect(pause).toBeDisabled();
+  await expect(playFromHere).toBeDisabled();
   await expect(stop).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Pause' })).toHaveCount(0);
+  await expect(
+    page.getByRole('navigation', { name: 'Keyboard octave' }),
+  ).toHaveCount(0);
 
   await page.getByRole('button', { name: 'Append', exact: true }).click();
   await page.getByRole('button', { name: 'Root D', exact: true }).click();
   await page.getByRole('button', { name: 'Append', exact: true }).click();
+  await expect(playFromHere).toBeEnabled();
+  for (const button of [play, playFromHere, stop])
+    await expect(button).toHaveText('');
+  const controlStyles = await Promise.all(
+    [play, remove].map((button) =>
+      button.evaluate((element) => {
+        const bounds = element.getBoundingClientRect();
+        return {
+          width: bounds.width,
+          height: bounds.height,
+          color: getComputedStyle(element).color,
+        };
+      }),
+    ),
+  );
+  expect(controlStyles[1]?.width).toBeCloseTo(controlStyles[0]!.width, 0);
+  expect(controlStyles[1]?.height).toBeCloseTo(controlStyles[0]!.height, 0);
+  expect(controlStyles[1]?.color).not.toBe(controlStyles[0]?.color);
+
+  const entries = page.locator('[data-entry-id]');
+  const beforeFromHere = await page.evaluate(
+    () => window.audioProbe.sources.length,
+  );
+  await playFromHere.click();
+  await expect(entries.nth(1)).toHaveAttribute('aria-current', 'true');
+  await expect
+    .poll(() => page.evaluate(() => window.audioProbe.sources.length))
+    .toBe(beforeFromHere + 3);
+  await stop.click();
+
   await play.click();
   await expect(play).toBeDisabled();
-  await expect(pause).toBeEnabled();
+  await expect(playFromHere).toBeDisabled();
   await expect(stop).toBeEnabled();
-  await expect(page.locator('[data-entry-id]').first()).toHaveAttribute(
-    'aria-current',
-    'true',
-  );
+  await expect(entries.first()).toHaveAttribute('aria-current', 'true');
   const scheduled = await page.evaluate(() =>
     window.audioProbe.sources.slice(-6).map((source) => source.start),
   );
@@ -412,23 +450,20 @@ test('progression transport plays at 150 BPM, pauses, resumes, and stops', async
   );
   expect(scheduled[3]! - scheduled[0]!).toBeCloseTo(0.8, 2);
 
-  await pause.click();
-  await expect(play).toBeEnabled();
-  await expect(pause).toBeDisabled();
-  await expect(stop).toBeEnabled();
-  await play.click();
-  await expect(pause).toBeEnabled();
-
-  const second = page.locator('[data-entry-id]').nth(1);
+  const second = entries.nth(1);
   await second.click();
   await expect(play).toBeEnabled();
-  await expect(pause).toBeDisabled();
+  await expect(playFromHere).toBeEnabled();
   await expect(stop).toBeEnabled();
   await expect(second).toHaveAttribute('data-playing', 'true');
   await expect(second).toHaveAttribute('aria-current', 'true');
   await expect(page.getByLabel('Currently playing notes')).toHaveText(
     'D4F♯4A4',
   );
+  await playFromHere.click();
+  await expect(play).toBeDisabled();
+  await expect(playFromHere).toBeDisabled();
+  await expect(second).toHaveAttribute('aria-current', 'true');
   await stop.click();
   await expect(stop).toBeDisabled();
 });
