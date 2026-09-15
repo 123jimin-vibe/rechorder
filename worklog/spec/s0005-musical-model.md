@@ -14,7 +14,7 @@ title = "Musical Model"
 ## Required model
 
 - A pitch has a musical identity and spelling. Tuning resolves it to frequency; sounding equality never erases spelling.
-- A chord stores a root, an optional explicitly spelled bass, an interval-based definition, and a separate voicing. Its display symbol is derived presentation.
+- A chord stores a root, an optional bass selection, an interval-based definition, and a separate voicing. A conventional bass selection binds either to a chord degree or an explicitly spelled pitch. Its display symbol and inversion are derived presentation.
 - A progression entry has a stable ID. Identical chords remain distinct entries.
 - Editing operations are plain-data insert, replace, remove, and move operations. Replacement preserves entry identity. Selection and playback state are outside the progression; available UI actions are governed by s0003.
 - Resolve frequency only at the sound boundary. Validate external values there and at construction boundaries; use ArkType if a runtime schema is useful.
@@ -23,18 +23,27 @@ title = "Musical Model"
 ## Initial values for t0002
 
 - Tuning: 12-tone equal temperament, A4 = 440 Hz.
-- Voicing: fixed root-position close voicing with the root in octave 4.
+- Default voicing: root-position ascending chord tones with the root in octave 4.
 - Chord catalogue: major, minor, diminished, augmented, sus2, sus4, dominant seventh, major seventh, and minor seventh.
 - The progression is untimed. Audition duration is not musical beat data.
 
 ## Deferred
 
-Tuning controls, register/voicing controls, text parsing, persistence, undo, and a comprehensive theory library.
+Tuning controls, text parsing, persistence, undo, suggestions, and a comprehensive theory library.
 
 ## Jazz and slash chords
 
 - Extend the initial catalogue with 6, m6, 6/9, add9, m(add9), m(maj7), dim7, m7♭5, 7sus4, and dominant/major/minor 9, 11 and 13.
 - Store editable ♭5, ♯5, ♭9, ♯9, ♯11 and ♭13 alterations explicitly. Altering a degree replaces that degree, or adds it when absent; conflicting alterations of the same degree are exclusive. Selecting a new type resets these modifiers.
-- Spell extensions by their diatonic degree, including double accidentals. Use complete ascending stacks for now, without implicit jazz omissions or automatic voice leading.
-- Slash bass accepts all 21 root spellings. Voice it strictly below the complete upper chord in the nearest available octave; retain the upper structure, including a duplicated bass pitch class if present. Preserve bass spelling independently of the root.
+- Spell extensions by their diatonic degree, including double accidentals. Start with complete ascending stacks; no implicit jazz omissions or automatic voice leading.
+- Bass analysis distinguishes root, chord degrees and pitches outside the defined chord, preserving spelling separately from sounding equivalence. Member choices include double accidentals and follow their degree through harmonic edits. Explicit pitch choices retain their spelling. Selecting a member rearranges existing tones to put it lowest without automatically doubling it; an outside bass is added below the upper chord.
 - These are conventional-adapter choices; generic musical data remains independent of twelve-tone tuning and octave assumptions.
+
+## Chord manipulation — t0022
+
+- Separate harmonic edits (quality, additions, alterations, explicit omissions) from voicing (register, spacing, octave placements, muted tones and doublings). Voicing edits preserve the symbol and defined membership.
+- Provide ascending/close and open voicings, whole-chord octave shifts and individual tone octave/copy controls. Keep the selected bass lowest and sounding; reject empty or contradictory voicings.
+- Derive root position and conventional triad/seventh inversions from spelled membership; label extended degrees by their role without inventing inversion names. Enharmonic equivalents remain distinguishable from exact spelled members.
+- Choosing a different root or catalogue type clears bass, alterations and other harmonic modifiers; choosing the same value replays without clearing. Preserve spacing and register; reset per-tone edits when harmony or bass changes.
+- Transpose root and explicit bass by a spelled interval together, retaining quality, modifiers and degree-bound voicing. Enharmonic respelling preserves sounding pitches. Progression transforms preserve entry IDs and order.
+- Conventional editor voicings stay within the existing C1–B6 audition range and at most 16 sounding notes, leaving room for transport lookahead and independent keyboard voices; disable edits that exceed these bounds. These are adapter/UI bounds, not generic musical restrictions.

@@ -35,15 +35,14 @@ describe('conventional chord adapter', () => {
           ).toBe(true);
         }
   });
-  it('preserves slash spelling below the complete upper structure', () => {
+  it('voices a chord-member bass by rearranging tones and preserves outside bass spelling', () => {
     const chord = createChord('C', 'major9', 'E');
     expect(chordSymbol(chord)).toBe('Cmaj9/E');
     expect(voiceChord(chord).map((pitch) => pitch.spelling)).toEqual([
-      'E3',
-      'C4',
       'E4',
       'G4',
       'B4',
+      'C5',
       'D5',
     ]);
     expect(voiceChord(createChord('C♭', 'minor', 'B♯'))[0]?.spelling).toBe(
@@ -58,18 +57,19 @@ describe('conventional chord adapter', () => {
     ]);
     expect(chordSymbol(chord)).toBe('F♯13(♭9,♯11)/E');
     expect(voiceChord(chord).map((pitch) => pitch.spelling)).toEqual([
-      'E4',
-      'F♯4',
-      'A♯4',
-      'C♯5',
       'E5',
+      'F♯5',
       'G5',
+      'A♯5',
       'B♯5',
+      'C♯6',
       'D♯6',
     ]);
     expect(chordRecipe(chord)).toEqual({
       definitionId: 'dominant13',
       alterations: ['♭9', '♯11'],
+      additions: [],
+      omissions: [],
     });
     expect(chordSymbol(alterChord(chord, []))).toBe('F♯13/E');
     expect(() => alterChord(chord, ['♭9', '♯9'])).toThrow();

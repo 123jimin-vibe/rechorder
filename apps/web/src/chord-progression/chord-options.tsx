@@ -2,7 +2,13 @@ import {
   alterChord,
   chordAlterations,
   chordRecipe,
-  createChord,
+  chooseChord,
+  chordTones,
+  bassRole,
+  bassPitch,
+  setBass,
+  rootLabel,
+  isAuditionable,
   jazzDefinitions,
   roots,
 } from '@rechorder/music';
@@ -21,16 +27,6 @@ interface OptionsProps {
 
 export function JazzOptions({ chord, onChange }: OptionsProps) {
   const recipe = chordRecipe(chord);
-  const rootId = roots.find(
-    (root) =>
-      root.pitch.position.letter === chord.root.position.letter &&
-      root.pitch.position.accidental === chord.root.position.accidental,
-  )?.id;
-  const bassId = roots.find(
-    (root) =>
-      root.pitch.position.letter === chord.bass?.position.letter &&
-      root.pitch.position.accidental === chord.bass.position.accidental,
-  )?.id;
   return (
     <div class={styles['extras']}>
       <details>
@@ -42,10 +38,12 @@ export function JazzOptions({ chord, onChange }: OptionsProps) {
               key={definition.id}
               aria-label={definition.label}
               aria-pressed={recipe.definitionId === definition.id}
-              onClick={() => {
-                if (rootId)
-                  onChange(createChord(rootId, definition.id, bassId));
-              }}
+              disabled={
+                !isAuditionable(chooseChord(chord, chord.root, definition.id))
+              }
+              onClick={() =>
+                onChange(chooseChord(chord, chord.root, definition.id))
+              }
             >
               <MusicalText text={definition.suffix} />
             </button>
@@ -53,31 +51,31 @@ export function JazzOptions({ chord, onChange }: OptionsProps) {
         </fieldset>
         <fieldset class={styles['alterations']}>
           <legend>Alterations</legend>
-          {chordAlterations.map((item) => (
-            <button
-              type="button"
-              key={item.id}
-              aria-label={`Alter ${item.id}`}
-              aria-pressed={recipe.alterations.includes(item.id)}
-              onClick={() => {
-                const remaining = recipe.alterations.filter(
-                  (id) =>
-                    chordAlterations.find((other) => other.id === id)?.interval
-                      .diatonicSteps !== item.interval.diatonicSteps,
-                );
-                onChange(
-                  alterChord(
-                    chord,
-                    recipe.alterations.includes(item.id)
-                      ? remaining
-                      : [...remaining, item.id],
-                  ),
-                );
-              }}
-            >
-              <MusicalText text={item.id} />
-            </button>
-          ))}
+          {chordAlterations.map((item) => {
+            const remaining = recipe.alterations.filter(
+              (id) =>
+                chordAlterations.find((other) => other.id === id)?.interval
+                  .diatonicSteps !== item.interval.diatonicSteps,
+            );
+            const next = alterChord(
+              chord,
+              recipe.alterations.includes(item.id)
+                ? remaining
+                : [...remaining, item.id],
+            );
+            return (
+              <button
+                type="button"
+                key={item.id}
+                aria-label={`Alter ${item.id}`}
+                aria-pressed={recipe.alterations.includes(item.id)}
+                disabled={!isAuditionable(next)}
+                onClick={() => onChange(next)}
+              >
+                <MusicalText text={item.id} />
+              </button>
+            );
+          })}
         </fieldset>
       </details>
     </div>
@@ -85,49 +83,91 @@ export function JazzOptions({ chord, onChange }: OptionsProps) {
 }
 
 export function BassOptions({ chord, onChange }: OptionsProps) {
-  const bassId = roots.find(
-    (root) =>
-      root.pitch.position.letter === chord.bass?.position.letter &&
-      root.pitch.position.accidental === chord.bass.position.accidental,
-  )?.id;
+  const tones = chordTones(chord);
+  const bass = bassPitch(chord) ?? chord.root;
+  const role = bassRole(chord);
   return (
-    <div class={styles['extras']}>
-      <details>
-        <summary>
-          Bass
-          {bassId ? (
-            <span>
-              {' '}
-              / <MusicalText text={bassId} />
-            </span>
-          ) : null}
-        </summary>
-        <fieldset aria-label="Slash bass">
+    <fieldset class={styles['bassOptions']} aria-label="Bass">
+      <legend>
+        Bass{' '}
+        <span aria-label="Bass position" class={styles['roleLabel']}>
+          {role.label}
+        </span>
+      </legend>
+      <div class={styles['tonePads']}>
+        {tones.map((tone) => (
           <button
             type="button"
-            aria-pressed={!chord.bass}
-            onClick={() => {
-              const { bass: _bass, ...rest } = chord;
-              onChange(rest);
-            }}
+            key={tone.degree}
+            aria-label={`Bass ${rootLabel(tone.pitch.position)} (${tone.label})`}
+            aria-pressed={role.member?.degree === tone.degree}
+            disabled={
+              !isAuditionable(
+                setBass(
+                  chord,
+                  tone.degree === 1
+                    ? undefined
+                    : { kind: 'degree', degree: tone.degree },
+                ),
+              )
+            }
+            onClick={() =>
+              onChange(
+                setBass(
+                  chord,
+                  tone.degree === 1
+                    ? undefined
+                    : { kind: 'degree', degree: tone.degree },
+                ),
+              )
+            }
           >
-            No slash
+            <MusicalText text={rootLabel(tone.pitch.position)} />
+            <small>{tone.label}</small>
           </button>
-          <div class={styles['roots']}>
-            {rootPads.map((root) => (
+        ))}
+      </div>
+      <details class={styles['otherBass']}>
+        <summary>
+          Other bass
+          {!role.member && (
+            <span>
+              {' '}
+              / <MusicalText text={rootLabel(bass.position)} />
+            </span>
+          )}
+        </summary>
+        <div class={styles['roots']}>
+          {rootPads.map((root) => {
+            const relation = bassRole(chord, root.pitch);
+            return relation.member ? (
+              <span key={root.id} />
+            ) : (
               <button
                 type="button"
                 key={root.id}
                 aria-label={`Bass ${root.id}`}
-                aria-pressed={root.id === bassId}
-                onClick={() => onChange({ ...chord, bass: root.pitch })}
+                disabled={
+                  !isAuditionable(
+                    setBass(chord, { kind: 'pitch', pitch: root.pitch }),
+                  )
+                }
+                title={relation.label}
+                data-equivalent={Boolean(relation.equivalent)}
+                aria-pressed={rootLabel(bass.position) === root.id}
+                onClick={() =>
+                  onChange(setBass(chord, { kind: 'pitch', pitch: root.pitch }))
+                }
               >
                 <MusicalText text={root.id} />
+                {relation.equivalent && (
+                  <small> ≈{relation.equivalent.label}</small>
+                )}
               </button>
-            ))}
-          </div>
-        </fieldset>
+            );
+          })}
+        </div>
       </details>
-    </div>
+    </fieldset>
   );
 }

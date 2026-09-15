@@ -25,31 +25,36 @@ or audio dependency. Audio consumes resolved notes and has no chord-theory or UI
 ## Musical data
 
 `Pitch<Position>` preserves a system-specific position and spelling.
-`Chord<Position, Interval, Voicing>` stores its root, optional spelled bass, interval definition, and separate
-voicing. `Tuning<Position>.frequency(position)` resolves a pitch at the audio boundary;
+`Chord<Position, Interval, Voicing, Bass>` stores its root, optional system-specific bass selection, interval definition, and separate
+voicing. The default bass type is a spelled pitch. `Tuning<Position>.frequency(position)` resolves a pitch at the audio boundary;
 `resolvePitches` retains labels and rejects non-finite or non-positive frequencies.
 Enharmonic pitches can sound alike while retaining distinct spellings.
 
 The `western.ts` adapter owns letter/accidental/octave coordinates, diatonic/chromatic
-intervals, basic/jazz definitions, explicit alterations, close root-position voicing rooted in octave 4, and 12-EDO at A4 = 440 Hz.
+intervals, basic/jazz definitions, explicit alterations/additions/omissions, and 12-EDO at A4 = 440 Hz.
 Those restrictions do not apply to the generic models. Other systems supply their own
 position/interval types, voicing, and tuning; tests exercise a non-octave period and
 unequal rational frequency ratios through the same resolution boundary.
 
-Jazz definitions provide complete ascending stacks, with no implicit omissions. Alterations
-replace or add a diatonic degree; changing type resets modifiers. Slash bass is voiced in
-the nearest octave strictly below the full upper structure. The conventional adapter
-also provides C1–B6 piano pitches; keyboard rendering matches sounding frequencies rather
+Jazz definitions start with complete ascending stacks, with no implicit omissions. Alterations
+replace or add a diatonic degree; choosing a different root or type resets bass and harmonic modifiers.
+`chord-manipulation.ts` owns spelled membership and inversion analysis, degree-bound or explicit bass,
+voicing, transposition and enharmonic respelling. Member bass rearranges existing tones without forced
+doubling; an outside bass is added below the upper chord. Voicing stores spacing, register and per-degree
+octave copies; an empty copy array mutes a tone without removing it from harmonic membership.
+The editor bounds voicings to C1–B6 and 16 sounding pitches, independently of generic music types.
+The conventional adapter also provides C1–B6 piano pitches; keyboard rendering matches sounding frequencies rather
 than spellings. Musical symbols follow the [Open Music Theory chord-symbol conventions](https://pressbooks.nebraska.edu/openmusictheory/chapter/chord-symbols/).
 
 `ProgressionEntry<Value>` adds a stable ID to a value. Operations return new arrays;
 callers treat entries and their nested values as immutable. Repeated chords have
 distinct IDs. Replacement preserves the selected ID and position. The page loads
 and auditions a selected entry, while root/type pads edit and audition a separate
-candidate. Only Append/Replace commit it. Backspace always removes the last entry;
+candidate. Append/Replace commit it; an explicit progression transposition transforms all entries while preserving IDs.
+Backspace always removes the last entry;
 removing the selected entry clears selection, keeping the candidate for reuse.
 
-Inputs currently come from a fixed catalogue. Membership and numeric boundary checks
+Inputs come from the catalogue and explicit musical transforms. Membership and numeric boundary checks
 are sufficient; no runtime schema library is needed. Prefer ArkType when future
 imports, persistence, or other external structured data need schemas.
 
@@ -95,7 +100,7 @@ the browser preserves the page in its back/forward cache. Errors go to `console.
 the controller's reporting callback can later show a snackbar.
 
 The progression transport snapshots entries on a stopped start and currently assigns
-each one two quarter-note beats at 120 BPM (1 second). It maintains a bounded
+each one two quarter-note beats at the editable tempo (initially 120 BPM). Applying BPM preserves fractional chord position, cancels stale schedules and retimes the remainder; it does not start audio or change individual audition duration. It maintains a bounded
 lookahead, but every voice uses an audio-clock start so JavaScript timer jitter does not
 move chord boundaries. Pause cancels scheduled handles and retains the exact elapsed
 offset; Play schedules the remaining part of the current chord and resumes the snapshot.

@@ -3,8 +3,13 @@ import {
   insertEntry,
   removeEntry,
   replaceEntry,
+  transposeChord,
 } from '@rechorder/music';
-import type { ProgressionEntry, WesternChord } from '@rechorder/music';
+import type {
+  ProgressionEntry,
+  WesternChord,
+  WesternInterval,
+} from '@rechorder/music';
 
 export interface EditorState {
   readonly entries: readonly ProgressionEntry<WesternChord>[];
@@ -15,6 +20,7 @@ export type EditorAction =
   | { readonly type: 'append'; readonly entry: ProgressionEntry<WesternChord> }
   | { readonly type: 'select'; readonly id: string }
   | { readonly type: 'replace'; readonly value: WesternChord }
+  | { readonly type: 'transpose'; readonly interval: WesternInterval }
   | { readonly type: 'remove-last' };
 
 export const initialEditor: EditorState = { entries: [], selectedId: null };
@@ -24,6 +30,14 @@ export function editorReducer(
   action: EditorAction,
 ): EditorState {
   switch (action.type) {
+    case 'transpose':
+      return {
+        ...state,
+        entries: state.entries.map((entry) => ({
+          ...entry,
+          value: transposeChord(entry.value, action.interval),
+        })),
+      };
     case 'append':
       return {
         entries: insertEntry(state.entries, state.entries.length, action.entry),

@@ -12,13 +12,14 @@ export type {
   WesternInterval,
   ChordAlteration,
   ChordRecipe,
+  WesternVoicing,
+  WesternBass,
 } from './western';
 export {
   chordDefinitions,
   roots,
   createChord,
   chordSymbol,
-  voiceChord,
   standardTuning,
   jazzDefinitions,
   chordAlterations,
@@ -26,7 +27,26 @@ export {
   alterChord,
   pianoPitches,
   defaultChordOctave,
+  bassPitch,
+  rootLabel,
 } from './western';
+export {
+  chordTones,
+  bassRole,
+  voicedTones,
+  voiceChord,
+  isAuditionable,
+  setToneVoicing,
+  setBass,
+  chooseChord,
+  setChordDegree,
+  transposeChord,
+  transposePitch,
+  transpositionIntervals,
+  enharmonicSpellings,
+  respellChord,
+} from './chord-manipulation';
+export type { ChordTone, VoicedTone } from './chord-manipulation';
 export type { ProgressionEntry } from './progression';
 export {
   entryIndex,

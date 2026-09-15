@@ -24,15 +24,30 @@ export interface WesternInterval {
   readonly chromaticSteps: number;
 }
 
-interface CloseVoicing {
-  readonly kind: 'root-position-close';
+export interface WesternVoicing {
+  readonly kind: 'close' | 'open';
+  readonly octave: number;
+  /** Octave offsets per degree; an empty array mutes it without changing harmony. */
+  readonly tones: readonly {
+    readonly degree: number;
+    readonly octaves: readonly number[];
+  }[];
 }
+
+export type WesternBass =
+  | { readonly kind: 'degree'; readonly degree: number }
+  | { readonly kind: 'pitch'; readonly pitch: Pitch<WesternPosition> };
 
 export type WesternChord = Chord<
   WesternPosition,
   WesternInterval,
-  CloseVoicing
-> & { readonly alterations: readonly ChordAlteration[] };
+  WesternVoicing,
+  WesternBass
+> & {
+  readonly alterations: readonly ChordAlteration[];
+  readonly additions: readonly number[];
+  readonly omissions: readonly number[];
+};
 
 function interval(
   diatonicSteps: number,
@@ -87,11 +102,13 @@ function accidentalLabel(accidental: number): string {
   return accidental < 0 ? '♭'.repeat(-accidental) : '♯'.repeat(accidental);
 }
 
-function rootLabel(position: WesternPosition): string {
+export function rootLabel(position: WesternPosition): string {
   return position.letter + accidentalLabel(position.accidental);
 }
 
-function spelledPitch(position: WesternPosition): Pitch<WesternPosition> {
+export function spelledPitch(
+  position: WesternPosition,
+): Pitch<WesternPosition> {
   return { position, spelling: rootLabel(position) + position.octave };
 }
 
@@ -108,7 +125,7 @@ export const roots = letters.flatMap((letter) =>
   }),
 );
 
-function chromaticPosition(position: WesternPosition): number {
+export function chromaticPosition(position: WesternPosition): number {
   if (
     !Number.isSafeInteger(position.octave) ||
     !Number.isSafeInteger(position.accidental)
@@ -148,21 +165,26 @@ export function createChord(
   return {
     root,
     alterations: [],
-    ...(bass ? { bass } : {}),
+    additions: [],
+    omissions: [],
+    ...(bass ? { bass: { kind: 'pitch' as const, pitch: bass } } : {}),
     definition: chordDefinition,
-    voicing: { kind: 'root-position-close' },
+    voicing: { kind: 'close', octave: 0, tones: [] },
   };
 }
 
 export function chordSymbol(chord: WesternChord): string {
+  const bass = bassPitch(chord);
   return (
     rootLabel(chord.root.position) +
     chord.definition.suffix +
-    (chord.bass ? '/' + rootLabel(chord.bass.position) : '')
+    (bass && rootLabel(bass.position) !== rootLabel(chord.root.position)
+      ? '/' + rootLabel(bass.position)
+      : '')
   );
 }
 
-export function voiceChord(
+export function chordPitches(
   chord: WesternChord,
 ): readonly Pitch<WesternPosition>[] {
   const root = chord.root.position;
@@ -175,17 +197,20 @@ export function voiceChord(
     const accidental = desired - ((octave + 1) * 12 + naturalSteps[letter]);
     return spelledPitch({ letter, octave, accidental });
   });
-  if (!chord.bass) return pitches;
-  // Keep the chord's complete upper structure; place the specified bass strictly below it.
-  const lowest = Math.min(
-    ...pitches.map((pitch) => chromaticPosition(pitch.position)),
-  );
-  const position = chord.bass.position;
-  const octave =
-    position.octave +
-    Math.ceil((lowest - chromaticPosition(position)) / 12) -
-    1;
-  return [spelledPitch({ ...position, octave }), ...pitches];
+  return pitches;
+}
+
+export function bassPitch(
+  chord: WesternChord,
+): Pitch<WesternPosition> | undefined {
+  if (!chord.bass) return undefined;
+  if (chord.bass.kind === 'pitch') return chord.bass.pitch;
+  const degree = chord.bass.degree;
+  return chordPitches(chord)[
+    chord.definition.intervals.findIndex(
+      (value) => value.diatonicSteps + 1 === degree,
+    )
+  ];
 }
 
 const majorThird = interval(2, 4);
@@ -316,9 +341,16 @@ export type ChordAlteration = (typeof chordAlterations)[number]['id'];
 export interface ChordRecipe {
   readonly definitionId: string;
   readonly alterations: readonly ChordAlteration[];
+  readonly additions: readonly number[];
+  readonly omissions: readonly number[];
 }
 export function chordRecipe(chord: WesternChord): ChordRecipe {
-  return { definitionId: chord.definition.id, alterations: chord.alterations };
+  return {
+    definitionId: chord.definition.id,
+    alterations: chord.alterations,
+    additions: chord.additions,
+    omissions: chord.omissions,
+  };
 }
 export function alterChord(
   chord: WesternChord,
@@ -331,6 +363,14 @@ export function alterChord(
   if (!base) throw new RangeError('Unsupported chord definition.');
   const selected = chordAlterations.filter((item) =>
     alterations.includes(item.id),
+  );
+  const omissions = chord.omissions.filter(
+    (degree) =>
+      !selected.some(
+        (item) =>
+          item.interval.diatonicSteps + 1 === degree &&
+          !chord.alterations.includes(item.id),
+      ),
   );
   if (
     new Set(selected.map((item) => item.interval.diatonicSteps)).size !==
@@ -346,19 +386,58 @@ export function alterChord(
     else intervals[index] = item.interval;
   }
   intervals.sort((a, b) => a.diatonicSteps - b.diatonicSteps);
-  return {
+  const modifiers = [
+    ...selected
+      .filter((item) => !omissions.includes(item.interval.diatonicSteps + 1))
+      .map((item) => item.id),
+    ...chord.additions
+      .filter(
+        (degree) =>
+          !omissions.includes(degree) &&
+          !selected.some((item) => item.interval.diatonicSteps + 1 === degree),
+      )
+      .map((degree) => 'add' + degree),
+    ...omissions.map((degree) => 'no' + degree),
+  ];
+  const next: WesternChord = {
     ...chord,
+    omissions,
+    voicing: { ...chord.voicing, tones: [] },
     alterations: selected.map((item) => item.id),
     definition: {
       ...base,
       suffix:
-        base.suffix +
-        (selected.length
-          ? '(' + selected.map((item) => item.id).join(',') + ')'
-          : ''),
-      intervals,
+        base.suffix + (modifiers.length ? '(' + modifiers.join(',') + ')' : ''),
+      intervals: [
+        ...intervals,
+        ...chord.additions
+          .filter(
+            (degree) =>
+              !intervals.some((value) => value.diatonicSteps + 1 === degree),
+          )
+          .map((degree) => ({
+            diatonicSteps: degree - 1,
+            chromaticSteps:
+              [0, 2, 4, 5, 7, 9, 11][(degree - 1) % 7]! +
+              12 * Math.floor((degree - 1) / 7),
+          })),
+      ]
+        .filter((value) => !omissions.includes(value.diatonicSteps + 1))
+        .sort((a, b) => a.diatonicSteps - b.diatonicSteps),
     },
   };
+  if (next.bass?.kind === 'degree') {
+    const degree = next.bass.degree;
+    if (
+      !next.definition.intervals.some(
+        (value) => value.diatonicSteps + 1 === degree,
+      )
+    ) {
+      const { bass: _bass, ...rest } = next;
+      return rest;
+    }
+  }
+  return next;
 }
 
 /** Keyboard coordinates stay in the western adapter, outside generic pitch types. */

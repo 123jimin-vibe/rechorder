@@ -6,6 +6,7 @@ import type {
 import type { ResolvedNote } from '@rechorder/music';
 
 export const progressionBpm = 120;
+export const tempoLimits = { min: 1, max: 600 } as const;
 export const progressionBeatsPerChord = 2;
 export const progressionChordDuration =
   (60 / progressionBpm) * progressionBeatsPerChord;
@@ -33,6 +34,7 @@ interface ProgressionSession {
 /** The page's audition and transport policy; voice ownership remains in the engine. */
 export class AuditionController {
   private static readonly progressionLookahead = 0.9;
+  private bpm = progressionBpm;
   private revision = 0;
   private progressionRevision = 0;
   private pendingSource: string | null = null;
@@ -51,6 +53,33 @@ export class AuditionController {
     private readonly reportError: (error: unknown) => void = (error) =>
       console.error('Chord playback failed.', error),
   ) {}
+
+  tempo(): number {
+    return this.bpm;
+  }
+
+  setTempo(bpm: number): void {
+    if (!Number.isFinite(bpm) || bpm < tempoLimits.min || bpm > tempoLimits.max)
+      throw new RangeError('Tempo is outside the supported playback range.');
+    if (bpm === this.bpm) return;
+    this.refreshProgression();
+    const progression = this.progression;
+    const position = progression
+      ? this.currentProgressionOffset(progression) / this.chordDuration()
+      : 0;
+    this.bpm = bpm;
+    if (!progression) return;
+    this.cancelProgressionHandles();
+    progression.offset = position * this.chordDuration();
+    progression.nextIndex = Math.floor(position);
+    if (progression.origin !== null)
+      progression.origin = this.engine.currentTime - progression.offset;
+    this.refreshProgression();
+  }
+
+  private chordDuration(): number {
+    return (60 / this.bpm) * progressionBeatsPerChord;
+  }
 
   /** Load the renderer ahead of the first gesture without starting audio. */
   async prepare(): Promise<void> {
@@ -128,7 +157,7 @@ export class AuditionController {
           notes: chord.notes.map((note) => ({ ...note })),
         })),
         status: 'stopped',
-        offset: startIndex * progressionChordDuration,
+        offset: startIndex * this.chordDuration(),
         origin: null,
         nextIndex: 0,
       };
@@ -150,7 +179,7 @@ export class AuditionController {
         return;
       progression.origin = this.engine.currentTime - progression.offset;
       progression.nextIndex = Math.floor(
-        progression.offset / progressionChordDuration,
+        progression.offset / this.chordDuration(),
       );
       this.refreshProgression();
       if (progression !== this.progression || progression.status !== 'playing')
@@ -202,7 +231,7 @@ export class AuditionController {
       status: progression.status,
       currentIndex: Math.min(
         progression.chords.length - 1,
-        Math.floor(offset / progressionChordDuration),
+        Math.floor(offset / this.chordDuration()),
       ),
     };
   }
@@ -278,7 +307,7 @@ export class AuditionController {
   private currentProgressionOffset(progression: ProgressionSession): number {
     if (progression.origin === null) return progression.offset;
     return Math.min(
-      progression.chords.length * progressionChordDuration,
+      progression.chords.length * this.chordDuration(),
       Math.max(0, this.engine.currentTime - progression.origin),
     );
   }
@@ -298,7 +327,7 @@ export class AuditionController {
     }
 
     const offset = this.currentProgressionOffset(progression);
-    const total = progression.chords.length * progressionChordDuration;
+    const total = progression.chords.length * this.chordDuration();
     if (offset >= total) {
       this.clearProgressionTimer();
       this.progressionHandles.clear();
@@ -306,16 +335,21 @@ export class AuditionController {
       return;
     }
 
-    const horizon = offset + AuditionController.progressionLookahead;
+    const horizon =
+      offset +
+      Math.min(
+        AuditionController.progressionLookahead,
+        this.chordDuration() * 2,
+      );
     while (
       progression.nextIndex < progression.chords.length &&
-      progression.nextIndex * progressionChordDuration < horizon
+      progression.nextIndex * this.chordDuration() < horizon
     ) {
       const index = progression.nextIndex++;
       const chord = progression.chords[index];
       if (!chord) continue;
-      const chordStart = index * progressionChordDuration;
-      const chordEnd = chordStart + progressionChordDuration;
+      const chordStart = index * this.chordDuration();
+      const chordEnd = chordStart + this.chordDuration();
       const segmentStart = Math.max(offset, chordStart);
       if (segmentStart >= chordEnd) continue;
       try {

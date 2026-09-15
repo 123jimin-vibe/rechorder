@@ -14,19 +14,14 @@ test('jazz and slash chords round-trip through append and replace', async ({
     .click();
   await page.getByRole('button', { name: 'Alter ♭9', exact: true }).click();
   await page.getByRole('button', { name: 'Alter ♯11', exact: true }).click();
-  await page
-    .getByRole('group', { name: 'Root and bass', exact: true })
-    .locator('summary')
-    .filter({ hasText: /^Bass$/ })
-    .click();
-  await page.getByRole('button', { name: 'Bass E', exact: true }).click();
+  await page.getByRole('button', { name: 'Bass E (3)', exact: true }).click();
   await expect(page.getByLabel('Candidate chord').locator('strong')).toHaveText(
     'C13(♭9,♯11)/E',
   );
   await page.getByRole('button', { name: 'Append', exact: true }).click();
   await page.getByRole('button', { name: 'Root F♯', exact: true }).click();
   await expect(page.getByLabel('Candidate chord').locator('strong')).toHaveText(
-    'F♯13(♭9,♯11)/E',
+    'F♯13',
   );
   const entry = page.locator('[data-entry-id]');
   const id = await entry.getAttribute('data-entry-id');
@@ -35,7 +30,7 @@ test('jazz and slash chords round-trip through append and replace', async ({
     page.getByRole('button', { name: 'Alter ♭9', exact: true }),
   ).toHaveAttribute('aria-pressed', 'true');
   await expect(
-    page.getByRole('button', { name: 'Bass E', exact: true }),
+    page.getByRole('button', { name: 'Bass E (3)', exact: true }),
   ).toHaveAttribute('aria-pressed', 'true');
   await page.getByRole('button', { name: 'Alter ♯9', exact: true }).click();
   await expect(
@@ -51,9 +46,13 @@ test('jazz and slash chords round-trip through append and replace', async ({
   ).toBe(true);
   await page.getByRole('button', { name: 'Major', exact: true }).click();
   await expect(page.getByLabel('Candidate chord').locator('strong')).toHaveText(
-    'C/E',
+    'C',
   );
-  await page.getByRole('button', { name: 'No slash', exact: true }).click();
+  await page.getByRole('button', { name: 'Bass G (5)', exact: true }).click();
+  await expect(page.getByLabel('Bass position')).toHaveText('2nd inversion');
+  await page
+    .getByRole('button', { name: 'Bass C (Root)', exact: true })
+    .click();
   await expect(page.getByLabel('Candidate chord').locator('strong')).toHaveText(
     'C',
   );

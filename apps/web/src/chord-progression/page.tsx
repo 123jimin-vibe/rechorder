@@ -9,6 +9,9 @@ import {
   chordDefinitions,
   chordSymbol,
   createChord,
+  chooseChord,
+  transposeChord,
+  isAuditionable,
   roots,
   resolvePitches,
   standardTuning,
@@ -20,6 +23,12 @@ import { useProgressionPlayback } from '../audio/use-progression-playback';
 import { useSoundingNotes } from '../audio/use-sounding-notes';
 import { editorReducer, initialEditor } from './editor';
 import { BassOptions, JazzOptions, rootPads } from './chord-options';
+import {
+  HarmonicOptions,
+  VoicingOptions,
+  TransformOptions,
+} from './manipulation-options';
+import { ProgressionSettings } from './settings';
 import { MusicalText } from './musical-text';
 import { PianoKeyboard } from '../components/piano-keyboard';
 import styles from './editor.module.css';
@@ -37,8 +46,7 @@ export function EditorPage({
   const rootId = roots.find(
     ({ pitch }) =>
       pitch.position.letter === candidate.root.position.letter &&
-      pitch.position.accidental === candidate.root.position.accidental &&
-      pitch.position.octave === candidate.root.position.octave,
+      pitch.position.accidental === candidate.root.position.accidental,
   )?.id;
   const sounding = useSoundingNotes(controller);
   const playback = useProgressionPlayback(controller);
@@ -71,6 +79,7 @@ export function EditorPage({
   }
 
   function auditionCandidate(chord: WesternChord) {
+    if (!isAuditionable(chord)) return;
     setCandidate(chord);
     play(chord, 'candidate');
   }
@@ -84,6 +93,7 @@ export function EditorPage({
 
   return (
     <main class={styles['shell']}>
+      <ProgressionSettings controller={controller} />
       <header class={styles['header']}>
         <a href={import.meta.env.BASE_URL}>
           Rechorder<span aria-hidden="true"> / </span>
@@ -228,65 +238,66 @@ export function EditorPage({
       </section>
 
       <section class={styles['composer']} aria-label="Chord builder">
-        <div class={styles['candidateRow']}>
-          <div class={styles['candidate']} aria-label="Candidate chord">
-            <strong>
-              <MusicalText text={chordSymbol(candidate)} />
-            </strong>
-            <span>
-              <MusicalText
-                text={candidateNotes.map((note) => note.spelling).join(' · ')}
-              />
-            </span>
-          </div>
-          <button
-            type="button"
-            class={styles['replay']}
-            aria-label="Play candidate"
-            onClick={() => play(candidate, 'candidate')}
-          >
-            <svg
-              aria-hidden="true"
-              viewBox="0 0 24 24"
-              width="18"
-              height="18"
-              fill="currentColor"
+        <div class={styles['composerToolbar']}>
+          <div class={styles['candidateRow']}>
+            <div class={styles['candidate']} aria-label="Candidate chord">
+              <strong>
+                <MusicalText text={chordSymbol(candidate)} />
+              </strong>
+              <span>
+                <MusicalText
+                  text={candidateNotes.map((note) => note.spelling).join(' · ')}
+                />
+              </span>
+            </div>
+            <button
+              type="button"
+              class={styles['replay']}
+              aria-label="Play candidate"
+              onClick={() => play(candidate, 'candidate')}
             >
-              <path d="m8 5 11 7-11 7Z" />
-            </svg>
-            Listen
-          </button>
-        </div>
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+                width="18"
+                height="18"
+                fill="currentColor"
+              >
+                <path d="m8 5 11 7-11 7Z" />
+              </svg>
+              Listen
+            </button>
+          </div>
 
-        <div class={styles['commits']}>
-          <button
-            type="button"
-            class={styles['primary']}
-            aria-label="Append"
-            onClick={() =>
-              dispatch({
-                type: 'append',
-                entry: { id: crypto.randomUUID(), value: candidate },
-              })
-            }
-          >
-            <span aria-hidden="true">＋</span> Append
-          </button>
-          <button
-            type="button"
-            disabled={!selected}
-            aria-label="Replace"
-            onClick={() => {
-              if (selected) {
-                controller.stopSource(selected.id);
-                dispatch({ type: 'replace', value: candidate });
+          <div class={styles['commits']}>
+            <button
+              type="button"
+              class={styles['primary']}
+              aria-label="Append"
+              onClick={() =>
+                dispatch({
+                  type: 'append',
+                  entry: { id: crypto.randomUUID(), value: candidate },
+                })
               }
-            }}
-          >
-            Replace
-          </button>
+            >
+              <span aria-hidden="true">＋</span> Append
+            </button>
+            <button
+              type="button"
+              disabled={!selected}
+              aria-label="Replace"
+              onClick={() => {
+                if (selected) {
+                  controller.stopSource(selected.id);
+                  dispatch({ type: 'replace', value: candidate });
+                }
+              }}
+            >
+              Replace
+            </button>
+          </div>
         </div>
-
         <div class={styles['choices']}>
           <fieldset class={styles['choiceGroup']} aria-label="Root and bass">
             <fieldset>
@@ -298,8 +309,11 @@ export function EditorPage({
                     key={root.id}
                     aria-label={`Root ${root.id}`}
                     aria-pressed={rootId === root.id}
+                    disabled={
+                      !isAuditionable(chooseChord(candidate, root.pitch))
+                    }
                     onClick={() =>
-                      auditionCandidate({ ...candidate, root: root.pitch })
+                      auditionCandidate(chooseChord(candidate, root.pitch))
                     }
                   >
                     <MusicalText text={root.id} />
@@ -319,12 +333,15 @@ export function EditorPage({
                     key={definition.id}
                     aria-label={definition.label}
                     aria-pressed={candidate.definition.id === definition.id}
+                    disabled={
+                      !isAuditionable(
+                        chooseChord(candidate, candidate.root, definition.id),
+                      )
+                    }
                     onClick={() => {
-                      if (rootId)
-                        auditionCandidate({
-                          ...createChord(rootId, definition.id),
-                          ...(candidate.bass ? { bass: candidate.bass } : {}),
-                        });
+                      auditionCandidate(
+                        chooseChord(candidate, candidate.root, definition.id),
+                      );
                     }}
                   >
                     {definition.suffix || 'Major'}
@@ -336,8 +353,21 @@ export function EditorPage({
               </div>
             </fieldset>
             <JazzOptions chord={candidate} onChange={auditionCandidate} />
+            <HarmonicOptions chord={candidate} onChange={auditionCandidate} />
           </fieldset>
         </div>
+        <VoicingOptions chord={candidate} onChange={auditionCandidate} />
+        <TransformOptions
+          chord={candidate}
+          onChange={auditionCandidate}
+          progression={state.entries.map((entry) => entry.value)}
+          onTransposeProgression={(interval) => {
+            controller.stopProgression();
+            for (const entry of state.entries) controller.stopSource(entry.id);
+            dispatch({ type: 'transpose', interval });
+            auditionCandidate(transposeChord(candidate, interval));
+          }}
+        />
       </section>
     </main>
   );
