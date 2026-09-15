@@ -96,7 +96,6 @@ export function usePianoGestures(
       if ([...gestures.current.values()].some((value) => value.dragging))
         return;
       gesture.dragging = true;
-      controller.release(source(event.pointerId));
     }
     if (gesture.dragging) element.scrollTo({ left: gesture.scroll - delta });
   }

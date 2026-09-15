@@ -87,12 +87,13 @@ for (const turn of [0, 1, 2, 3]) {
       initialUpper,
     );
     await expect(held).toHaveAttribute('aria-pressed', 'true');
-    await expect(dragged).toHaveAttribute('aria-pressed', 'false');
+    await expect(dragged).toHaveAttribute('aria-pressed', 'true');
     await input.send('Input.dispatchTouchEvent', {
       type: turn === 3 ? 'touchCancel' : 'touchEnd',
       touchPoints: [],
     });
     await expect(held).toHaveAttribute('aria-pressed', 'false');
+    await expect(dragged).toHaveAttribute('aria-pressed', 'false');
 
     const beforeWheel = await lower.evaluate((element) => element.scrollLeft);
     const rowBox = (await lower.boundingBox())!;
@@ -112,6 +113,27 @@ for (const turn of [0, 1, 2, 3]) {
     });
   });
 }
+
+test('mouse dragging scrolls without releasing the starting key', async ({
+  page,
+}) => {
+  await page.addInitScript(installAudioProbe);
+  await page.goto('./piano/');
+  const row = page.locator('[data-keyboard-scroll="piano:upper"]');
+  const key = row.getByRole('button', { name: 'Play G4', exact: true });
+  const before = await row.evaluate((element) => element.scrollLeft);
+  const point = await keyPoint(key, 0);
+  await page.mouse.move(point.x, point.y);
+  await page.mouse.down();
+  await expect(key).toHaveAttribute('aria-pressed', 'true');
+  await page.mouse.move(point.x + 100, point.y, { steps: 5 });
+  await expect
+    .poll(() => row.evaluate((element) => element.scrollLeft))
+    .toBeLessThan(before - 80);
+  await expect(key).toHaveAttribute('aria-pressed', 'true');
+  await page.mouse.up();
+  await expect(key).toHaveAttribute('aria-pressed', 'false');
+});
 
 test('rotation completes a full cycle without resetting rows or adding visible labels', async ({
   page,

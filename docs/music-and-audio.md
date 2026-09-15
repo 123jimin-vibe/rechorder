@@ -113,7 +113,8 @@ per-finger dragging, optional octave shortcuts and single-lifecycle Space/Enter 
 touch/pen presses suppress native focus and tap rectangles while keyboard focus remains
 visible, and screen readers retain spelled-note announcements. The chord utility hides the optional shortcuts.
 The free Piano page mounts two instances with separate scroll positions and input source IDs.
-Dragging releases that finger's starting note while stationary fingers keep playing. The
+Dragging retains that pointer's starting note while scrolling; pointer end or cancellation
+releases it, and stationary fingers keep playing. The
 rotatable viewport provides an orientation context so touch drags and wheel input follow
 the keyboard's inline axis through all four orientations. Keyboard surfaces own their touch
 gestures because [browser panning may suppress concurrent pointers](https://www.w3.org/TR/pointerevents3/#the-touch-action-css-property).

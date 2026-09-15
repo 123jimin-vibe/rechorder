@@ -33,7 +33,7 @@ title = "Chord Progression"
 
 ## Presentation and verification
 
-- Share the playable keyboard and its self-contained key styling with s0006. Pointer drags scroll the keyboard and release their own starting note; stationary fingers may continue playing independently.
+- Share the playable keyboard and its self-contained key styling with s0006. Pointer drags scroll the keyboard while their starting notes continue until pointer release or cancellation; stationary fingers may continue playing independently.
 
 - Keep the timeline the same height when empty or filled, with no vertical overflow and enough room for complete buttons plus the native scrollbar. Show no visual ordinals, count, or placeholder instructions. Put remove-last outside its horizontal scroll area; compact buttons expand to preserve complete extended/slash symbols. Give progression items a subtle raised-button treatment by default and a pressed treatment only while that item's chord is sounding, whether from a direct tap or automatic playback; selection remains a distinct state.
 - Use compact root and bass pads (at least 36 px at default text size), preserving one-tap access to all spellings. Group root pads in aligned sharp, natural, flat rows (e.g. C♯ above C and C♭ below); preserve this alignment when zoomed. The piano is a conventional-adapter view; future temperaments may replace it without changing musical data. Keep the candidate heading and sounding-note display geometrically stable as symbols and active notes change.
