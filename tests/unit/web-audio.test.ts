@@ -15,6 +15,8 @@ function nativeHarness(load: () => Promise<void> = async () => {}) {
     close = vi.fn(async () => {
       this.state = 'closed';
     });
+    addEventListener = vi.fn();
+    removeEventListener = vi.fn();
   }
   const context = new FakeContext();
   class FakeNode {
@@ -139,5 +141,34 @@ describe('native audio worklet lifecycle', () => {
     expect(nodes).toHaveLength(2);
     expect(context.audioWorklet.addModule).toHaveBeenCalledOnce();
     await driver.close();
+  });
+
+  it('refuses audio a never-activated document may not start, then starts it', async () => {
+    const { context } = nativeHarness();
+    const userActivation = { hasBeenActive: false };
+    vi.stubGlobal('navigator', { userActivation });
+    const driver = createWebAudioDriver();
+    await expect(driver.resume()).rejects.toThrow('could not start');
+    expect(context.resume).not.toHaveBeenCalled();
+    expect(driver.running).toBe(false);
+    userActivation.hasBeenActive = true;
+    await driver.resume();
+    expect(driver.running).toBe(true);
+    await driver.close();
+  });
+
+  it('stops waiting for a parked resume so a later gesture starts audio', async () => {
+    vi.useFakeTimers();
+    const { context } = nativeHarness();
+    context.resume.mockImplementationOnce(() => new Promise<void>(() => {}));
+    const driver = createWebAudioDriver();
+    const blocked = expect(driver.resume()).rejects.toThrow('could not start');
+    await vi.advanceTimersByTimeAsync(2000);
+    await blocked;
+    expect(driver.running).toBe(false);
+    await driver.resume();
+    expect(driver.running).toBe(true);
+    await driver.close();
+    vi.useRealTimers();
   });
 });

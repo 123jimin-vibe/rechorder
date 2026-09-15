@@ -93,13 +93,13 @@ export function EditorPage({
 
   return (
     <main class={styles['shell']}>
-      <ProgressionSettings controller={controller} />
       <header class={styles['header']}>
         <a href={import.meta.env.BASE_URL}>
           Rechorder<span aria-hidden="true"> / </span>
         </a>
         <h1>Chord progression</h1>
       </header>
+      <ProgressionSettings controller={controller} />
 
       <section class={styles['playingRow']} aria-labelledby="playing-heading">
         <h2 id="playing-heading">

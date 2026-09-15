@@ -357,15 +357,37 @@
   border-block-end: 1px solid var(--border);
   padding-block-end: 0.375rem;
   & label {
-    display: flex;
-    align-items: center;
-    gap: 0.375rem;
     font-size: 0.8125rem;
     font-weight: 650;
   }
+}
+.tempo {
+  display: flex;
+  flex: 1 1 auto;
+  min-inline-size: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.375rem;
+  /* The pads own stepping; arrow keys still adjust the field. */
   & input {
-    inline-size: 5rem;
+    flex: 0 1 4rem;
+    text-align: center;
+    appearance: textfield;
   }
+  & input::-webkit-inner-spin-button,
+  & input::-webkit-outer-spin-button {
+    appearance: none;
+    margin: 0;
+  }
+}
+.shell .tempo button {
+  inline-size: 2.25rem;
+  min-block-size: 2.25rem;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  font-size: 1.125rem;
+  line-height: 1;
 }
 .shell :where(input[type='number'], select) {
   min-block-size: 2.25rem;

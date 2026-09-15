@@ -6,8 +6,16 @@ import {
   type BowedReply,
 } from './bowed-protocol';
 
+/** Main-thread handle to the worklet renderer; all sample generation runs there. */
+export interface BowedInstrument {
+  readonly schedule: AudioDriver['schedule'];
+  /** True once the renderer reported an unrecoverable error. */
+  readonly failed: boolean;
+  dispose(): void;
+}
+
 /** Main-thread resource/lifecycle adapter. All sample generation runs in the worklet. */
-export function createBowedString(context: BaseAudioContext) {
+export function createBowedString(context: BaseAudioContext): BowedInstrument {
   const node = new AudioWorkletNode(context, 'rechorder-bowed-strings', {
     numberOfInputs: 0,
     numberOfOutputs: 1,

@@ -86,7 +86,13 @@ See [model provenance](../packages/audio/THIRD_PARTY_NOTICES.md).
 release envelopes. The bow lifts on release and stored string/body energy rings down
 inside the release envelope. `bowed-string.ts` owns messages and voice cleanup;
 `web-audio.ts` loads and constructs the worklet while the context is suspended, then
-resumes that prepared graph from the first musical gesture.
+resumes that prepared graph from the first musical gesture. A navigation started by a
+gesture carries sticky activation into the new document, but a refresh does not, so the
+first press on a reloaded page can reach a document that may not start audio. The
+specification leaves such a `resume()` pending forever, so the driver never awaits it
+alone: it fails immediately when the document has never been activated, and otherwise
+watches the context state under a two-second bound. Either way the attempt settles, the
+error is reported, and the gesture that activates the document starts audio.
 Live and scheduled voices are capped at 64 notes; each player's nominal round-trip
 delay is capped at 65,536 samples. Allocation does not grow with held duration.
 The linear mono mix uses square-root voice-count gain and a 3 ms lookahead peak

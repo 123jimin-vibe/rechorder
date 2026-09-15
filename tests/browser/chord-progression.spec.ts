@@ -623,6 +623,67 @@ test('removing or replacing a source cancels it; suspended audio resumes from a 
   await expect(sounding).toHaveText('No notes playing');
 });
 
+test('a document that may not start audio recovers on the gesture that activates it', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    // A reloaded document carries no sticky activation, and the specification
+    // parks resume() rather than rejecting it until audio may start.
+    let activated = false;
+    const activate = () => {
+      activated = true;
+    };
+    addEventListener('touchend', activate, true);
+    addEventListener('pointerup', activate, true);
+    Object.defineProperty(navigator, 'userActivation', {
+      configurable: true,
+      get: () => ({ hasBeenActive: activated, isActive: activated }),
+    });
+    window.AudioContext = class extends AudioContext {
+      override resume(): Promise<void> {
+        return activated ? super.resume() : new Promise<void>(() => {});
+      }
+    };
+  });
+  await page.goto('./chord-progression/');
+  const piano = page.getByRole('group', {
+    name: 'Piano keyboard',
+    exact: true,
+  });
+  const c = piano.getByRole('button', { name: 'Play C4', exact: true });
+  await c.scrollIntoViewIfNeeded();
+  const box = (await c.boundingBox())!;
+  const contact = {
+    id: 21,
+    x: box.x + box.width / 2,
+    y: box.y + box.height - 15,
+  };
+  const input = await page.context().newCDPSession(page);
+  await input.send('Input.dispatchTouchEvent', {
+    type: 'touchStart',
+    touchPoints: [contact],
+  });
+  await expect(c).toHaveAttribute('aria-pressed', 'false');
+  await input.send('Input.dispatchTouchEvent', {
+    type: 'touchEnd',
+    touchPoints: [],
+  });
+  await input.send('Input.dispatchTouchEvent', {
+    type: 'touchStart',
+    touchPoints: [contact],
+  });
+  await expect(c).toHaveAttribute('aria-pressed', 'true');
+  await input.send('Input.dispatchTouchEvent', {
+    type: 'touchEnd',
+    touchPoints: [],
+  });
+  await input.detach();
+  await page.getByRole('button', { name: 'Root D', exact: true }).click();
+  await expect(page.getByLabel('Currently playing notes')).toHaveText(
+    'D4F♯4A4',
+  );
+});
+
 test('audio failure is logged while append and replace remain usable', async ({
   page,
 }) => {

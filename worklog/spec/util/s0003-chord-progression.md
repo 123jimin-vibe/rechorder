@@ -27,7 +27,7 @@ title = "Chord Progression"
 ## Progression playback
 
 - Provide Play, Play from here, and Stop beside the progression. Play starts at the beginning when stopped and resumes from the preserved position after an individual audition pauses it. Play from here starts a fresh snapshot at the selected entry; disable it without a selection and while transport is playing. Stop and natural completion reset to the beginning. Use distinct accessible icons where their meaning remains clear.
-- Every chord lasts two quarter-note beats at the BPM in the top settings form (initially 120). Transport timing is playback policy rather than stored chord data. Applying tempo during playback preserves musical position and updates remaining scheduling; paused playback resumes at the new tempo. Individual auditions remain one second.
+- Every chord lasts two quarter-note beats at the BPM in the settings form below the page header (initially 120). Transport timing is playback policy rather than stored chord data. Applying tempo during playback preserves musical position and updates remaining scheduling; paused playback resumes at the new tempo. Individual auditions remain one second.
 - Starting any individual chord audition, including a candidate edit, candidate replay, or timeline chord, pauses progression playback first. Keyboard notes remain independent and do not pause it.
 - Playback snapshots the ordered entries when it starts. A paused snapshot resumes independently of later editor changes; the next stopped start captures the current progression.
 
@@ -50,7 +50,7 @@ Supporting varied musical data does not require exposing these controls now.
 
 ## Compact manipulation and settings — t0022
 
-- Put a compact, labelled BPM number form at the very top of the page, in a settings container that can accommodate more settings. Apply finite values from 1–600 BPM on blur or Enter; invalid values retain the last applied tempo and expose native validation. Editing settings never starts audio. This initial playback UI bound is not a generic musical restriction.
+- Put a compact, labelled BPM number form directly below the page header, in a settings container that can accommodate more settings. Apply finite values from 1–600 BPM on blur or Enter; invalid values retain the last applied tempo and expose native validation. Decrease and increase pads beside the field apply one beat per press, clamp to the same range and disable at the bounds. Editing settings never starts audio. The row wraps rather than overflowing narrow or zoomed layouts. This initial playback UI bound is not a generic musical restriction.
 - Show chord-member bass choices directly under Root, with pitch and degree labels and a concise derived bass-position label. Put all other spelled bass choices in a nested disclosure; distinguish exact members, enharmonic equivalents and outside tones.
 - Keep uncommon harmonic tone edits under Chord type. Add/remove degrees explicitly; keep performance muting in Voicing.
 - In portrait, keep the candidate, audition and commit controls sticky within the builder so users can commit lower controls without scrolling back. Preserve normal document flow and keyboard visibility.

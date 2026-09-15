@@ -118,7 +118,7 @@ test('transpose preserves inversion, supports whole progressions and keeps respe
   ]);
 });
 
-test('top BPM form changes transport timing without starting audio or changing auditions', async ({
+test('BPM form below the header steps and applies transport timing without starting audio', async ({
   page,
 }) => {
   await page.addInitScript(installAudioProbe);
@@ -131,7 +131,11 @@ test('top BPM form changes transport timing without starting audio or changing a
   const header = await page
     .getByRole('heading', { name: 'Chord progression', exact: true })
     .boundingBox();
-  expect(form!.y).toBeLessThan(header!.y);
+  expect(form!.y).toBeGreaterThan(header!.y);
+  await page.getByRole('button', { name: 'Increase tempo' }).click();
+  await expect(bpm).toHaveValue('121');
+  await page.getByRole('button', { name: 'Decrease tempo' }).click();
+  await expect(bpm).toHaveValue('120');
   await bpm.fill('60');
   await bpm.press('Enter');
   expect(await page.evaluate(() => window.audioProbe.resumeCalls)).toBe(0);

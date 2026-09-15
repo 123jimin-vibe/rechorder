@@ -30,6 +30,7 @@ Provide reusable individual-chord playback for candidate and list-item actions i
 - Keyboard gestures own independent cancellable voices, capped at ten concurrent held inputs with conservative fixed gain. Held strings sustain until their input releases or cancels, subject only to a one-day backend safety bound; releasing a gesture releases its voice. A release while audio initializes prevents a late note. Hidden-page stop/disposal also clears held inputs.
 - Report active notes and scheduled start/end through the playback lifecycle, including release. The note display follows that state.
 - Prepare the suspended audio context and renderer after page load so worklet loading is outside the first-note path, but resume audio only from a musical user gesture. Preparation does not schedule or start sound. The application owns disposal, stops sound on page hidden, and the latest chord request wins while initialization is pending.
+- A document that may not start audio leaves its resume request pending indefinitely, so never wait on that request alone. Report the failure promptly — immediately when the document has never been activated — and keep every later gesture able to start audio, so one blocked attempt cannot silence the page.
 - On initialization or playback failure, log the error with `console.error` and keep editing usable. A snackbar replaces this reporting path later.
 
 ## Verification
