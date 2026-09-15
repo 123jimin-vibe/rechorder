@@ -10,6 +10,20 @@ const notes = [
 ];
 
 describe('audio scheduling engine', () => {
+  it('prepares its driver without starting audio and reuses it on initialization', async () => {
+    const driver = new FakeDriver();
+    const factory = vi.fn(() => driver);
+    const engine = createPlaybackEngine(factory);
+    await engine.prepare();
+    expect(factory).toHaveBeenCalledOnce();
+    expect(driver.prepareCalls).toBe(1);
+    expect(driver.resumeCalls).toBe(0);
+    expect(engine.running).toBe(false);
+    await engine.initialize();
+    expect(factory).toHaveBeenCalledOnce();
+    expect(driver.resumeCalls).toBe(1);
+  });
+
   it('starts lazily, schedules polyphony on the audio clock, and includes release until completion', async () => {
     const driver = new FakeDriver();
     const factory = vi.fn(() => driver);
@@ -301,6 +315,11 @@ describe('page audition policy', () => {
     expect(controller.notes()).toEqual([]);
     await controller.press('finger3', notes[0]!);
     expect(controller.notes()).toHaveLength(1);
+    driver.advance(4.1);
+    expect(controller.notes()).toHaveLength(1);
+    controller.release('finger3');
+    driver.advance(0.11);
+    expect(controller.notes()).toEqual([]);
     await controller.dispose();
     expect(controller.notes()).toEqual([]);
   });

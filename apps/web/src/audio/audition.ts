@@ -52,6 +52,16 @@ export class AuditionController {
       console.error('Chord playback failed.', error),
   ) {}
 
+  /** Load the renderer ahead of the first gesture without starting audio. */
+  async prepare(): Promise<void> {
+    if (this.disposed) return;
+    try {
+      await this.engine.prepare();
+    } catch (error) {
+      if (!this.disposed) this.reportError(error);
+    }
+  }
+
   async play(notes: readonly ResolvedNote[], source: string): Promise<void> {
     this.pauseProgression();
     const revision = ++this.revision;
@@ -208,7 +218,9 @@ export class AuditionController {
       held.handle = this.engine.schedule({
         notes: [note],
         startTime: this.engine.currentTime,
-        duration: 4,
+        // The backend requires a finite safety bound; interaction release normally
+        // ends this voice, while one day avoids changing a human-length hold.
+        duration: 24 * 60 * 60,
         level: 0.25,
       });
     } catch (error) {

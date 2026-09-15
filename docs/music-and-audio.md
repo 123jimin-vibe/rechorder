@@ -55,7 +55,8 @@ imports, persistence, or other external structured data need schemas.
 
 ## Audio lifecycle
 
-`initialize()` lazily creates/resumes audio from a user audition gesture. `schedule({ notes,
+`prepare()` creates a suspended context and loads the renderer after page load without
+starting sound. `initialize()` resumes that prepared audio from a user audition gesture. `schedule({ notes,
 startTime, duration, level? })` accepts seconds on `engine.currentTime` and an optional
 level from zero to one, and returns a stable
 handle with `state` and `cancel()`. Past starts clamp to now. Each request copies its
@@ -79,7 +80,8 @@ See [model provenance](../packages/audio/THIRD_PARTY_NOTICES.md).
 `bowed-renderer.ts` streams into one AudioWorklet, with audio-frame scheduling and
 release envelopes. The bow lifts on release and stored string/body energy rings down
 inside the release envelope. `bowed-string.ts` owns messages and voice cleanup;
-`web-audio.ts` lazily loads the worklet while resuming the context from the gesture.
+`web-audio.ts` loads and constructs the worklet while the context is suspended, then
+resumes that prepared graph from the first musical gesture.
 Live and scheduled voices are capped at 64 notes; each player's nominal round-trip
 delay is capped at 65,536 samples. Allocation does not grow with held duration.
 The linear mono mix uses square-root voice-count gain and a 3 ms lookahead peak
@@ -102,12 +104,14 @@ completion reset to the beginning. Any one-chord audition pauses the transport f
 while held keyboard notes remain independent.
 
 Keyboard presses use independent handles at one-quarter level, up to ten held gestures.
-They can sound alongside the chord audition, sustain for up to four seconds, and release
-on pointer/key up, cancellation, lost capture or keyboard blur. Pending gestures are
+They can sound alongside the chord audition, sustain until release (with a one-day backend
+safety bound), and release on pointer/key up, cancellation, lost capture, keyboard blur,
+or window focus loss. Pending gestures are
 identity-checked after audio resume so a released finger cannot produce a late note.
 The shared keyboard owns its key styling and sounding-key press feedback, pointer capture,
-per-finger dragging, optional octave shortcuts and Space/Enter support; screen readers
-retain spelled-note announcements. The chord utility hides the optional shortcuts.
+per-finger dragging, optional octave shortcuts and single-lifecycle Space/Enter support;
+touch/pen presses suppress native focus and tap rectangles while keyboard focus remains
+visible, and screen readers retain spelled-note announcements. The chord utility hides the optional shortcuts.
 The free Piano page mounts two instances with separate scroll positions and input source IDs.
 Dragging releases that finger's starting note while stationary fingers keep playing. The
 rotatable viewport provides an orientation context so touch drags and wheel input follow

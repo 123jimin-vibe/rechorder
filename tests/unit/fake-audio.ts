@@ -13,11 +13,18 @@ export class FakeDriver implements AudioDriver {
   currentTime = 0;
   running = false;
   closed = false;
+  prepareCalls = 0;
   resumeCalls = 0;
   failure: Error | null = null;
   failVoice = -1;
   gate: Promise<void> = Promise.resolve();
   readonly voices: FakeVoice[] = [];
+
+  async prepare() {
+    this.prepareCalls++;
+    if (this.failure) throw this.failure;
+    if (this.closed) throw new Error('Closed');
+  }
 
   async resume() {
     this.resumeCalls++;

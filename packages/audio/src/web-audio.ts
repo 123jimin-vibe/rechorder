@@ -9,6 +9,22 @@ export function createWebAudioDriver(): AudioDriver {
   const context = new AudioContext();
   let instrument: ReturnType<typeof createBowedString> | undefined;
   let module: Promise<void> | undefined;
+  const closed = () => context.state === 'closed';
+  const prepare = async () => {
+    if (closed()) throw new Error('Audio context is closed.');
+    module ??= context.audioWorklet
+      .addModule(processorUrl)
+      .catch((error: unknown) => {
+        module = undefined;
+        throw error;
+      });
+    await module;
+    if (closed()) throw new Error('Audio context closed while preparing.');
+    if (!instrument || instrument.failed) {
+      instrument?.dispose();
+      instrument = createBowedString(context);
+    }
+  };
   return {
     get currentTime() {
       return context.currentTime;
@@ -20,24 +36,15 @@ export function createWebAudioDriver(): AudioDriver {
         !instrument!.failed
       );
     },
+    prepare,
     async resume() {
-      if (context.state === 'closed')
-        throw new Error('Audio context is closed.');
-      // Call resume during the gesture, before awaiting the module fetch.
-      const resume = context.resume();
-      module ??= context.audioWorklet
-        .addModule(processorUrl)
-        .catch((error: unknown) => {
-          module = undefined;
-          throw error;
-        });
-      await Promise.all([resume, module]);
+      if (closed()) throw new Error('Audio context is closed.');
+      // Call resume during the gesture, before awaiting any in-flight preparation.
+      const resume =
+        context.state === 'running' ? Promise.resolve() : context.resume();
+      await Promise.all([resume, prepare()]);
       if (context.state !== 'running')
         throw new Error('Audio context could not start.');
-      if (!instrument || instrument.failed) {
-        instrument?.dispose();
-        instrument = createBowedString(context);
-      }
     },
     schedule(...args) {
       if (!instrument)

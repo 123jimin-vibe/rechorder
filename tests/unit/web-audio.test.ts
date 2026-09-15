@@ -41,6 +41,23 @@ afterEach(() => {
 });
 
 describe('native audio worklet lifecycle', () => {
+  it('prepares the renderer while suspended and only resumes on demand', async () => {
+    const { context, nodes } = nativeHarness();
+    const driver = createWebAudioDriver();
+    await driver.prepare();
+    expect(context.audioWorklet.addModule).toHaveBeenCalledOnce();
+    expect(context.resume).not.toHaveBeenCalled();
+    expect(context.state).toBe('suspended');
+    expect(nodes).toHaveLength(1);
+    expect(driver.running).toBe(false);
+    await driver.resume();
+    expect(context.resume).toHaveBeenCalledOnce();
+    expect(context.audioWorklet.addModule).toHaveBeenCalledOnce();
+    expect(nodes).toHaveLength(1);
+    expect(driver.running).toBe(true);
+    await driver.close();
+  });
+
   it('resumes in the gesture and becomes schedulable only after the module loads', async () => {
     let loaded!: () => void;
     const { context, nodes } = nativeHarness(
@@ -103,7 +120,7 @@ describe('native audio worklet lifecycle', () => {
       ready = driver.resume();
     await driver.close();
     loaded();
-    await expect(ready).rejects.toThrow('Audio context could not start');
+    await expect(ready).rejects.toThrow('closed while preparing');
     expect(nodes).toHaveLength(0);
   });
 

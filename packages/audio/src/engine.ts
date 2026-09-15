@@ -33,6 +33,7 @@ export interface ActiveNote {
 export interface PlaybackEngine {
   readonly running: boolean;
   readonly currentTime: number;
+  prepare(): Promise<void>;
   initialize(): Promise<void>;
   schedule(request: PlaybackRequest): PlaybackHandle;
   activeNotes(): readonly ActiveNote[];
@@ -89,6 +90,13 @@ export function createPlaybackEngine(
     },
     get currentTime() {
       return driver?.currentTime ?? 0;
+    },
+    async prepare() {
+      if (disposed) throw new Error('Audio engine is disposed.');
+      driver ??= factory();
+      await driver.prepare();
+      if (disposed)
+        throw new Error('Audio engine was disposed while preparing.');
     },
     async initialize() {
       if (disposed) throw new Error('Audio engine is disposed.');

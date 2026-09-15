@@ -133,14 +133,6 @@ test('piano highlights enharmonic pitches and releases independent touch and key
   await expect(c).toHaveAttribute('aria-pressed', 'true');
   await page.keyboard.up('Space');
   await expect(c).toHaveAttribute('aria-pressed', 'false');
-  await page.getByRole('button', { name: 'C3', exact: true }).click();
-  await expect(
-    piano.getByRole('button', { name: 'Play C3', exact: true }),
-  ).toBeInViewport();
-  await page.getByRole('button', { name: 'C6', exact: true }).click();
-  await expect(
-    piano.getByRole('button', { name: 'Play B6', exact: true }),
-  ).toBeInViewport();
   await expect(page.locator('[data-entry-id]')).toHaveCount(0);
 });
 
@@ -149,7 +141,11 @@ test('two direct choices audition a candidate without committing it', async ({
 }) => {
   await page.addInitScript(installAudioProbe);
   await page.goto('./chord-progression/');
-  expect(await page.evaluate(() => window.audioProbe.contexts.length)).toBe(0);
+  await expect
+    .poll(() => page.evaluate(() => window.audioProbe.worklets.length))
+    .toBe(1);
+  expect(await page.evaluate(() => window.audioProbe.contexts.length)).toBe(1);
+  expect(await page.evaluate(() => window.audioProbe.resumeCalls)).toBe(0);
 
   await expect(
     page.getByRole('group', { name: 'Root', exact: true }).getByRole('button'),

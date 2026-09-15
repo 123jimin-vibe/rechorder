@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef } from 'preact/hooks';
+import { useEffect, useLayoutEffect, useRef } from 'preact/hooks';
 import {
   pianoPitches,
   resolvePitches,
@@ -40,7 +40,24 @@ export function PianoKeyboard({
   readonly showOctaveShortcuts?: boolean;
 }) {
   const viewport = useRef<HTMLDivElement>(null);
+  const keyboardSources = useRef(new Set<string>());
   const gestures = usePianoGestures(viewport, controller, sourceId);
+  const releaseKeyboardSource = (source: string) => {
+    if (!keyboardSources.current.delete(source)) return;
+    controller.release(source);
+  };
+  useEffect(() => {
+    const active = keyboardSources.current;
+    const releaseAll = () => {
+      for (const source of active) controller.release(source);
+      active.clear();
+    };
+    window.addEventListener('blur', releaseAll);
+    return () => {
+      releaseAll();
+      window.removeEventListener('blur', releaseAll);
+    };
+  }, [controller, sourceId]);
   function showOctave(octave: number) {
     const element = viewport.current;
     const key = element?.querySelector<HTMLElement>(
@@ -116,24 +133,22 @@ export function PianoKeyboard({
                 onKeyDown={(event) => {
                   if (event.key === ' ' || event.key === 'Enter') {
                     event.preventDefault();
-                    if (!event.repeat)
+                    if (
+                      !event.repeat &&
+                      !keyboardSources.current.has(keyboardSource)
+                    ) {
+                      keyboardSources.current.add(keyboardSource);
                       void controller.press(keyboardSource, note);
+                    }
                   }
                 }}
                 onKeyUp={(event) => {
                   if (event.key === ' ' || event.key === 'Enter') {
                     event.preventDefault();
-                    controller.release(keyboardSource);
+                    releaseKeyboardSource(keyboardSource);
                   }
                 }}
-                onBlur={() => controller.release(keyboardSource)}
-                onClick={(event) => {
-                  if (event.detail === 0)
-                    void controller.play(
-                      [note],
-                      `${sourceId}:keyboard-accessibility`,
-                    );
-                }}
+                onBlur={() => releaseKeyboardSource(keyboardSource)}
               >
                 <span>
                   {pitch.position.letter}

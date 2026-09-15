@@ -137,9 +137,54 @@ test('rotation completes a full cycle without resetting rows or adding visible l
   await expect(page.getByText('Lower', { exact: true })).toHaveCount(0);
 });
 
+test('prepares audio before touch without focusing or duplicating the held key', async ({
+  page,
+  browserName,
+}) => {
+  test.skip(browserName !== 'chromium', 'Uses Chromium touch injection.');
+  await page.addInitScript(installAudioProbe);
+  await page.goto('./piano/');
+  await expect
+    .poll(() => page.evaluate(() => window.audioProbe.worklets.length))
+    .toBe(1);
+  expect(await page.evaluate(() => window.audioProbe.contexts.length)).toBe(1);
+  expect(await page.evaluate(() => window.audioProbe.resumeCalls)).toBe(0);
+
+  const key = page
+    .getByRole('group', { name: 'Upper piano keyboard' })
+    .getByRole('button', { name: 'Play C4', exact: true });
+  const point = { id: 21, ...(await keyPoint(key, 0)) };
+  const input = await page.context().newCDPSession(page);
+  await input.send('Input.dispatchTouchEvent', {
+    type: 'touchStart',
+    touchPoints: [point],
+  });
+  await expect(key).toHaveAttribute('aria-pressed', 'true');
+  await expect
+    .poll(() => page.evaluate(() => window.audioProbe.sources.length))
+    .toBe(1);
+  expect(
+    await key.evaluate((element) => ({
+      focused: document.activeElement === element,
+      tap: getComputedStyle(element).getPropertyValue(
+        '-webkit-tap-highlight-color',
+      ),
+    })),
+  ).toEqual({ focused: false, tap: 'rgba(0, 0, 0, 0)' });
+  await input.send('Input.dispatchTouchEvent', {
+    type: 'touchEnd',
+    touchPoints: [],
+  });
+  await input.detach();
+  await expect(key).toHaveAttribute('aria-pressed', 'false');
+  await page.waitForTimeout(150);
+  expect(await page.evaluate(() => window.audioProbe.sources.length)).toBe(1);
+});
+
 test('both utilities share complete key styling and keyboard controls', async ({
   page,
 }) => {
+  await page.addInitScript(installAudioProbe);
   const keyStyle = (key: Locator) =>
     key.evaluate((element) => {
       const style = getComputedStyle(element);
@@ -173,14 +218,21 @@ test('both utilities share complete key styling and keyboard controls', async ({
     ),
   ).toEqual(black);
   await key.focus();
+  expect(
+    await key.evaluate((element) => getComputedStyle(element).outlineStyle),
+  ).toBe('solid');
   await page.keyboard.down('Space');
   await expect(key).toHaveAttribute('aria-pressed', 'true');
   await page.waitForTimeout(100);
   const pressed = await keyStyle(key);
   expect(pressed.shadow).not.toBe(white.shadow);
   expect(pressed.transform).not.toBe(white.transform);
+  await page.evaluate(() => window.dispatchEvent(new Event('blur')));
+  await expect(key).toHaveAttribute('aria-pressed', 'false');
   await page.keyboard.up('Space');
   await expect(key).toHaveAttribute('aria-pressed', 'false');
+  await page.waitForTimeout(150);
+  expect(await page.evaluate(() => window.audioProbe.sources.length)).toBe(1);
 
   const blackKey = piano.getByRole('button', {
     name: 'Play C♯4',
@@ -195,4 +247,6 @@ test('both utilities share complete key styling and keyboard controls', async ({
   expect(blackPressed.transform).not.toBe(black.transform);
   await page.keyboard.up('Space');
   await expect(blackKey).toHaveAttribute('aria-pressed', 'false');
+  await page.waitForTimeout(150);
+  expect(await page.evaluate(() => window.audioProbe.sources.length)).toBe(2);
 });

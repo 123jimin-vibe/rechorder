@@ -7,6 +7,7 @@ export interface Voice {
 export interface AudioDriver {
   readonly currentTime: number;
   readonly running: boolean;
+  prepare(): Promise<void>;
   resume(): Promise<void>;
   schedule(
     frequency: number,

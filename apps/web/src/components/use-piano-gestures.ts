@@ -72,6 +72,10 @@ export function usePianoGestures(
     const element = viewport.current;
     if (!element || event.button !== 0 || gestures.current.has(event.pointerId))
       return;
+    // Touch/pen input owns its press state; do not let a compatibility click
+    // focus the native button or add a platform tap rectangle.
+    if (note && (event.pointerType === 'touch' || event.pointerType === 'pen'))
+      event.preventDefault();
     element.setPointerCapture(event.pointerId);
     gestures.current.set(event.pointerId, {
       start: inlineMovement(event.clientX, event.clientY, turn),
@@ -98,8 +102,8 @@ export function usePianoGestures(
   }
 
   function end(event: PointerEvent) {
+    if (!gestures.current.delete(event.pointerId)) return;
     controller.release(source(event.pointerId));
-    gestures.current.delete(event.pointerId);
   }
 
   return { start, move, end };

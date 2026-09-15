@@ -8,6 +8,7 @@ const root = document.getElementById('app');
 if (!root) throw new Error('Application root is missing.');
 
 const controller = new AuditionController(createPlaybackEngine());
+void controller.prepare();
 const onVisibility = () => {
   if (document.hidden) controller.stopAll();
 };
