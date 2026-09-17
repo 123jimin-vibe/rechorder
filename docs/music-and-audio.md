@@ -22,6 +22,11 @@
 Import reusable packages through their declared exports. Music has no Preact, DOM,
 or audio dependency. Audio consumes resolved notes and has no chord-theory or UI dependency.
 
+The conventional recommendation engine is also owned by `@rechorder/music`.
+See [Chord recommendations](chord-recommendations.md) for its pure API, ranking
+pipeline, limits, and the UI's separate preview/commit workflow. The editor reducer
+supports stable-ID insertion between adjacent entries for this workflow.
+
 ## Musical data
 
 `Pitch<Position>` preserves a system-specific position and spelling.

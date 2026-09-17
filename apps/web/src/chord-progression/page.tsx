@@ -11,13 +11,14 @@ import {
   createChord,
   chooseChord,
   transposeChord,
+  transposePitch,
   isAuditionable,
   roots,
   resolvePitches,
   standardTuning,
   voiceChord,
 } from '@rechorder/music';
-import type { WesternChord } from '@rechorder/music';
+import type { TonalKey, WesternChord } from '@rechorder/music';
 import type { AuditionController } from '../audio/audition';
 import { useProgressionPlayback } from '../audio/use-progression-playback';
 import { useSoundingNotes } from '../audio/use-sounding-notes';
@@ -29,6 +30,8 @@ import {
   TransformOptions,
 } from './manipulation-options';
 import { ProgressionSettings } from './settings';
+import { Recommendations } from './recommendations';
+import type { SuggestionMode } from './recommendations';
 import { MusicalText } from './musical-text';
 import { PianoKeyboard } from '../components/piano-keyboard';
 import styles from './editor.module.css';
@@ -40,6 +43,13 @@ export function EditorPage({
 }) {
   const [state, dispatch] = useReducer(editorReducer, initialEditor);
   const [candidate, setCandidate] = useState(() => createChord('C', 'major'));
+  const [tonalKey, setTonalKey] = useState<TonalKey>();
+  const [suggestionMode, setSuggestionMode] = useState<SuggestionMode>('next');
+  const progression = useMemo(
+    () => state.entries.map((entry) => entry.value),
+    [state.entries],
+  );
+  const insertedId = useRef<string | null>(null);
   const previousLength = useRef(0);
   const stripRef = useRef<HTMLFieldSetElement>(null);
   const candidateNotes = useMemo(() => voiceChord(candidate), [candidate]);
@@ -60,7 +70,14 @@ export function EditorPage({
 
   useLayoutEffect(() => {
     const strip = stripRef.current;
-    if (strip && state.entries.length > previousLength.current)
+    if (strip && insertedId.current) {
+      strip
+        .querySelector<HTMLElement>(`[data-entry-id="${insertedId.current}"]`)
+        ?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+      // Preact refs are mutable lifecycle storage; this rule recognizes React only.
+      // oxlint-disable-next-line react/immutability
+      insertedId.current = null;
+    } else if (strip && state.entries.length > previousLength.current)
       strip.scrollTo({ left: strip.scrollWidth });
     // Preact refs are mutable lifecycle storage; this rule only recognizes React refs.
     // oxlint-disable-next-line react/immutability
@@ -91,6 +108,29 @@ export function EditorPage({
     }));
   }
 
+  function useSuggestion(chord: WesternChord, mode: SuggestionMode) {
+    if (mode === 'bass') {
+      setCandidate(chord);
+      return;
+    }
+    if ((mode === 'replace' || mode === 'between') && !selected) return;
+    controller.stopProgression();
+    controller.stopSource('suggestion');
+    controller.stopSource('candidate');
+    if (mode === 'replace' && selected) {
+      controller.stopSource(selected.id);
+      dispatch({ type: 'replace', value: chord });
+    } else {
+      const entry = { id: crypto.randomUUID(), value: chord };
+      if (mode === 'between' && selected) {
+        // oxlint-disable-next-line react/immutability
+        insertedId.current = entry.id;
+        dispatch({ type: 'insert-after', id: selected.id, entry });
+      } else dispatch({ type: 'append', entry });
+    }
+    setCandidate(chord);
+  }
+
   return (
     <main class={styles['shell']}>
       <header class={styles['header']}>
@@ -99,7 +139,11 @@ export function EditorPage({
         </a>
         <h1>Chord progression</h1>
       </header>
-      <ProgressionSettings controller={controller} />
+      <ProgressionSettings
+        controller={controller}
+        tonalKey={tonalKey}
+        onKeyChange={setTonalKey}
+      />
 
       <section class={styles['playingRow']} aria-labelledby="playing-heading">
         <h2 id="playing-heading">
@@ -238,6 +282,20 @@ export function EditorPage({
         </div>
       </section>
 
+      <Recommendations
+        progression={progression}
+        selectedIndex={state.entries.findIndex(
+          (entry) => entry.id === state.selectedId,
+        )}
+        candidate={candidate}
+        tonalKey={tonalKey}
+        mode={suggestionMode}
+        onMode={setSuggestionMode}
+        onPreview={(chord) => play(chord, 'suggestion')}
+        onBassChange={auditionCandidate}
+        onUse={useSuggestion}
+      />
+
       <section class={styles['composer']} aria-label="Chord builder">
         <div class={styles['composerToolbar']}>
           <div class={styles['candidateRow']}>
@@ -366,6 +424,11 @@ export function EditorPage({
             controller.stopProgression();
             for (const entry of state.entries) controller.stopSource(entry.id);
             dispatch({ type: 'transpose', interval });
+            if (tonalKey)
+              setTonalKey({
+                ...tonalKey,
+                tonic: transposePitch(tonalKey.tonic, interval),
+              });
             auditionCandidate(transposeChord(candidate, interval));
           }}
         />

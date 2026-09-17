@@ -1,4 +1,7 @@
 import { useState } from 'preact/hooks';
+import { rootLabel, roots, tonalModes } from '@rechorder/music';
+import type { TonalKey, TonalMode } from '@rechorder/music';
+import { modeLabels } from './recommendations';
 import { tempoLimits } from '../audio/audition';
 import type { AuditionController } from '../audio/audition';
 import styles from './editor.module.css';
@@ -8,8 +11,12 @@ const tempoStep = 1;
 
 export function ProgressionSettings({
   controller,
+  tonalKey,
+  onKeyChange,
 }: {
   readonly controller: AuditionController;
+  readonly tonalKey: TonalKey | undefined;
+  readonly onKeyChange: (key: TonalKey | undefined) => void;
 }) {
   const [value, setValue] = useState(String(controller.tempo()));
   const typed = Number.parseFloat(value);
@@ -67,6 +74,54 @@ export function ProgressionSettings({
         >
           <span aria-hidden="true">+</span>
         </button>
+      </div>
+      <div class={styles['tonalSettings']}>
+        <label htmlFor="tonic">Key</label>
+        <select
+          id="tonic"
+          value={tonalKey ? rootLabel(tonalKey.tonic.position) : ''}
+          onChange={(event) => {
+            const tonic = roots.find(
+              (root) => root.id === event.currentTarget.value,
+            )?.pitch;
+            onKeyChange(
+              tonic ? { tonic, mode: tonalKey?.mode ?? 'major' } : undefined,
+            );
+          }}
+        >
+          <option value="">Auto</option>
+          {tonalKey &&
+            !roots.some(
+              (root) => root.id === rootLabel(tonalKey.tonic.position),
+            ) && (
+              <option value={rootLabel(tonalKey.tonic.position)}>
+                {rootLabel(tonalKey.tonic.position)}
+              </option>
+            )}
+          {roots.map((root) => (
+            <option key={root.id} value={root.id}>
+              {root.id}
+            </option>
+          ))}
+        </select>
+        <label htmlFor="tonal-mode">Mode</label>
+        <select
+          id="tonal-mode"
+          value={tonalKey?.mode ?? ''}
+          disabled={!tonalKey}
+          onChange={(event) => {
+            const mode = event.currentTarget.value as TonalMode;
+            if (tonalKey && mode in tonalModes)
+              onKeyChange({ ...tonalKey, mode });
+          }}
+        >
+          {!tonalKey && <option value="">Auto</option>}
+          {(Object.keys(tonalModes) as TonalMode[]).map((mode) => (
+            <option key={mode} value={mode}>
+              {modeLabels[mode]}
+            </option>
+          ))}
+        </select>
       </div>
     </form>
   );

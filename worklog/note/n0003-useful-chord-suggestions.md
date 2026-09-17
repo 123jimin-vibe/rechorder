@@ -5,7 +5,7 @@ title = "Useful chord suggestions"
 
 ## Principles
 
-- Research and future requirements only; suggestions are not implemented or authorized by this note.
+- Research background and future considerations only; implemented suggestions are governed by s0003 and s0005, not this note. See t0025 and `docs/chord-recommendations.md` for delivered scope and limits.
 - Suggestions should explain musical relationships and respect user intent. Scale membership alone is insufficient; rules depend on musical style.
 
 ## Required foundations

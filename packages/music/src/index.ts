@@ -55,3 +55,24 @@ export {
   removeEntry,
   moveEntry,
 } from './progression';
+export { recommendChords } from './recommendations/recommend';
+export type {
+  RecommendationTarget,
+  RecommendationRequest,
+  RecommendationReason,
+  RecommendationScore,
+  ChordRecommendation,
+  RecommendationResult,
+} from './recommendations/recommend';
+export {
+  tonalModes,
+  inferTonality,
+  scalePitches,
+} from './recommendations/tonality';
+export type {
+  TonalMode,
+  TonalKey,
+  TonalContext,
+  TonalHypothesis,
+} from './recommendations/tonality';
+export { voiceLeadingDistance } from './recommendations/voice-leading';

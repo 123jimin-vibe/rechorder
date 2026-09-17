@@ -18,6 +18,11 @@ export interface EditorState {
 
 export type EditorAction =
   | { readonly type: 'append'; readonly entry: ProgressionEntry<WesternChord> }
+  | {
+      readonly type: 'insert-after';
+      readonly id: string;
+      readonly entry: ProgressionEntry<WesternChord>;
+    }
   | { readonly type: 'select'; readonly id: string }
   | { readonly type: 'replace'; readonly value: WesternChord }
   | { readonly type: 'transpose'; readonly interval: WesternInterval }
@@ -30,6 +35,14 @@ export function editorReducer(
   action: EditorAction,
 ): EditorState {
   switch (action.type) {
+    case 'insert-after': {
+      const index = entryIndex(state.entries, action.id);
+      if (index === state.entries.length - 1) return state;
+      return {
+        entries: insertEntry(state.entries, index + 1, action.entry),
+        selectedId: action.entry.id,
+      };
+    }
     case 'transpose':
       return {
         ...state,

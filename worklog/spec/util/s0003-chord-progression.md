@@ -19,7 +19,7 @@ title = "Chord Progression"
 - Appending scrolls the horizontal timeline to reveal the new end item. Selecting an existing item does not initiate scrolling. Users may freely scroll; native keyboard focus may reveal its target.
 - **Append** adds the candidate at the end and selects the new entry. **Replace** changes only the selected entry's value, preserving its ID and position; disable it when nothing is selected. Neither commit adds another audition.
 - One accessible backspace button always removes the last entry, regardless of selection. Preserve an earlier selection; if the selected last entry is removed, clear selection. Keep the candidate available for reuse.
-- No cursor, insertion gaps, move buttons, per-item Play/Remove buttons, or drag reordering.
+- No cursor, insertion gaps, move buttons, per-item Play/Remove buttons, or drag reordering. Smart suggestions may insert between a selected entry and its successor.
 - Keep the progression in memory without an arbitrary length cap. Candidate edits do not change entries until committed; repeated chords retain distinct IDs.
 - Above the Progression timeline, a touchable C1–B6 piano keyboard highlights sounding pitches, including enharmonic equivalents and release tails. Initially show C4. Horizontal scrolling reaches its keys; omit octave shortcut controls in this utility. This range includes the lowest slash bass and highest catalogue extension. Press/hold promptly plays one note until release, cancelled touch, lost capture or keyboard focus; do not add a second audition from the compatibility click. Support simultaneous fingers and Space/Enter. Touch and pen presses avoid native focus/tap rectangles while keyboard focus remains visible. Keep a screen-reader note announcement. Keyboard notes do not edit chords and may sound alongside an audition.
 - Auditions snapshot their notes; removing/replacing their source cancels that source's audition.
@@ -44,8 +44,8 @@ title = "Chord Progression"
 ## Future — excluded
 
 - Editable beat lengths.
-- Drag reordering, non-English support, chord suggestions.
-- Soundfont/articulation, musical-scale and temperament controls.
+- Drag reordering and non-English support.
+- Soundfont/articulation and temperament controls.
 
 Supporting varied musical data does not require exposing these controls now.
 
@@ -57,4 +57,21 @@ Supporting varied musical data does not require exposing these controls now.
 - In portrait, keep the candidate, audition and commit controls sticky within the builder so users can commit lower controls without scrolling back. Preserve normal document flow and keyboard visibility.
 - Group spacing and register controls under Voicing, with per-tone octave/mute/doubling controls in its disclosure. Keep common root/type/bass actions direct and compact; preserve candidate display geometry and avoid page overflow on portrait or zoom.
 - Group interval/direction and candidate/progression scope under Transpose; group enharmonic spelling there too. Candidate transforms audition without committing; progression transforms update entries without changing their IDs, stop stale transport, and transform the candidate consistently.
-- Chord suggestions remain deferred; n0003 preserves future requirements.
+- Contextual suggestions are governed by the section below; n0003 remains supporting research.
+
+## Smart chord suggestions — t0025
+
+### Principles
+
+- Offer explainable choices, not a single supposedly correct continuation. Key is optional context, never a hard whitelist; inferred context is uncertain.
+- Preserve deliberate commits, candidate isolation and stable entry identity. Keep the common path compact on portrait screens, with labelled controls instead of instructional prose.
+
+### Settings and actions
+
+- Add optional tonic and mode settings alongside BPM, initially Auto with no assumed key. Support major, minor and the remaining diatonic modes. Settings do not start audio or edit chords.
+- Whole-progression transposition also transposes an explicit tonic, preserving mode and spelling; candidate-only transposition leaves tonal settings intact.
+- Place one compact recommendation panel beside the timeline/builder, with Next, Replace, Between and Bass modes and four ranked choices. Next appends at the end; Replace targets the selected stored chord; Between inserts after the selection only when a following chord exists; Bass offers other chord types/roots over the candidate's sounding bass.
+- Disable unavailable targets. Show the target chords/bass and any sufficiently supported inferred key as a possibility. A suggestion's labelled preview auditions without editing the candidate or timeline. Its adjacent Add, Replace, Insert or Use action applies directly without an additional audition.
+- Bass mode includes a direct bass picker that edits/auditions the candidate, keeping bass exploration inside the panel.
+- Next/Replace/Between commits load the chosen chord into the candidate and select the affected entry. Replacement keeps the entry ID; insertion preserves neighboring IDs. Bass Use loads the candidate for ordinary Append/Replace, preserving the bass pitch and register.
+- Suggestion commits that change the progression stop stale transport and affected auditions. An insertion reveals its new entry rather than scrolling to the end. Preserve the panel's layout while previewing, and use a two-column list on portrait with reachable touch targets and no page overflow.

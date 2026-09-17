@@ -52,6 +52,30 @@ describe('progression operations', () => {
 });
 
 describe('editor state', () => {
+  it('inserts between neighbors, selects the new ID, and rejects stale or terminal gaps', () => {
+    const state = editorReducer(
+      { entries, selectedId: 'a' },
+      { type: 'insert-after', id: 'a', entry: entry('new') },
+    );
+    expect(ids(state)).toEqual(['a', 'new', 'b', 'c']);
+    expect(state.selectedId).toBe('new');
+    expect(state.entries[0]).toBe(entries[0]);
+    expect(state.entries[2]).toBe(entries[1]);
+    expect(
+      editorReducer(state, {
+        type: 'insert-after',
+        id: 'c',
+        entry: entry('unused'),
+      }),
+    ).toBe(state);
+    expect(() =>
+      editorReducer(state, {
+        type: 'insert-after',
+        id: 'missing',
+        entry: entry('unused'),
+      }),
+    ).toThrow();
+  });
   it('always appends at the end and selects the new identity', () => {
     let state: EditorState = { entries, selectedId: 'a' };
     state = editorReducer(state, { type: 'append', entry: entry('d') });

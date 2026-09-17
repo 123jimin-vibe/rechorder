@@ -29,7 +29,16 @@ title = "Musical Model"
 
 ## Deferred
 
-Tuning controls, text parsing, persistence, undo, suggestions, and a comprehensive theory library.
+Tuning controls, text parsing, persistence, undo, and a comprehensive theory library.
+
+## Contextual recommendations — t0025
+
+- Keep recommendations in the conventional adapter, with pure typed APIs independent of UI and audio. Do not impose conventional tonal assumptions on generic musical data.
+- Accept ordered context, an explicit insertion/replacement position or a fixed-bass candidate, optional tonic/mode, and a result limit. Return concrete auditionable chords, numerical ranking components, structured reasons and uncertain tonal hypotheses.
+- Rank using local context on both sides, optional/inferred key fit, harmonic function and directed resolutions (including applied dominants and minor-key leading tones), common tones, actual register-aware voice movement, bass motion, replacement similarity and complexity. Scale membership alone cannot decide suitability.
+- Infer tonal hypotheses from a bounded neighborhood, without treating the initial candidate as evidence for an empty progression. Avoid a confident key claim for sparse or ambiguous evidence; explicit context overrides inference. Prefer key-consistent spelling and preserve fixed-bass spelling and sounding register.
+- Search across roots and catalogue qualities, including inversions for a fixed bass. Select playable voicings using both neighbors; expose a diverse, deterministic ranked list rather than enharmonic duplicates or many near-identical extensions. Keep input data immutable and computation bounded independently of full progression length.
+- These are transparent tonal heuristics, not a trained model or a style/melody/rhythm-aware harmonization system. No inferred melody, pedal, timing or stylistic intention.
 
 ## Jazz and slash chords
 
