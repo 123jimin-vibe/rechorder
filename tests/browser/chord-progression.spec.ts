@@ -746,6 +746,48 @@ test('narrow portrait and zoom keep choices and commits within the page', async 
   await page.getByRole('button', { name: 'Replace', exact: true }).click();
 });
 
+test('compact mobile workspace keeps primary controls comfortably touchable', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('./chord-progression/');
+
+  const touchTargets = [
+    page.getByRole('button', { name: 'Decrease tempo', exact: true }),
+    page.getByRole('button', { name: 'Play', exact: true }),
+    page.getByRole('button', { name: 'Play candidate', exact: true }),
+    page.getByRole('button', { name: 'Append', exact: true }),
+    page.getByRole('button', { name: 'Root C', exact: true }),
+    page.getByRole('button', { name: 'Bass C (Root)', exact: true }),
+    page.getByRole('button', { name: 'Major', exact: true }),
+  ];
+  for (const target of touchTargets) {
+    const box = await target.boundingBox();
+    expect(box).toBeTruthy();
+    expect(box!.width).toBeGreaterThanOrEqual(36);
+    expect(box!.height).toBeGreaterThanOrEqual(36);
+  }
+
+  const candidate = (await page.getByLabel('Candidate chord').boundingBox())!;
+  const append = (await page
+    .getByRole('button', { name: 'Append', exact: true })
+    .boundingBox())!;
+  expect(Math.max(candidate.y, append.y)).toBeLessThan(
+    Math.min(candidate.y + candidate.height, append.y + append.height),
+  );
+
+  const pianoKey = (await page
+    .getByRole('button', { name: 'Play C4', exact: true })
+    .boundingBox())!;
+  expect(pianoKey.height).toBeGreaterThanOrEqual(80);
+  expect(pianoKey.height).toBeLessThan(100);
+  expect(
+    (await page
+      .getByRole('group', { name: 'Chord progression' })
+      .boundingBox())!.height,
+  ).toBeLessThanOrEqual(56);
+});
+
 test('bowed chords sustain audible output through dense chords and overlapping notes', async ({
   page,
 }, testInfo) => {

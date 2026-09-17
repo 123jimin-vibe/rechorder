@@ -113,6 +113,7 @@ export function EditorPage({
         <PianoKeyboard
           controller={controller}
           notes={uniqueNotes}
+          compact
           showOctaveShortcuts={false}
         />
       </section>
@@ -254,6 +255,7 @@ export function EditorPage({
               type="button"
               class={styles['replay']}
               aria-label="Play candidate"
+              title="Play candidate"
               onClick={() => play(candidate, 'candidate')}
             >
               <svg
@@ -265,7 +267,6 @@ export function EditorPage({
               >
                 <path d="m8 5 11 7-11 7Z" />
               </svg>
-              Listen
             </button>
           </div>
 

@@ -30,6 +30,7 @@ export function PianoKeyboard({
   sourceId = 'chord-piano',
   label = 'Piano keyboard',
   fill = false,
+  compact = false,
   showOctaveShortcuts = true,
 }: {
   readonly controller: PianoPlayer;
@@ -37,6 +38,7 @@ export function PianoKeyboard({
   readonly sourceId?: string;
   readonly label?: string;
   readonly fill?: boolean;
+  readonly compact?: boolean;
   readonly showOctaveShortcuts?: boolean;
 }) {
   const viewport = useRef<HTMLDivElement>(null);
@@ -72,7 +74,9 @@ export function PianoKeyboard({
     showOctave(defaultChordOctave);
   }, []);
   return (
-    <div class={`${styles['piano']} ${fill ? styles['fill'] : ''}`}>
+    <div
+      class={`${styles['piano']} ${fill ? styles['fill'] : ''} ${compact ? styles['compact'] : ''}`}
+    >
       {showOctaveShortcuts && !fill && (
         <nav aria-label="Keyboard octave" class={styles['octaves']}>
           {octaves.map((octave) => (
