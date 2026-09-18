@@ -75,6 +75,87 @@ function harmonicIdentity(chord: WesternChord): string {
   );
 }
 
+const functionalBassReasons: Readonly<
+  Partial<Record<RecommendationReason['kind'], true>>
+> = {
+  'dominant-resolution': true,
+  'leading-tone-resolution': true,
+  'ii-v': true,
+  plagal: true,
+};
+const interpretationReasons: Readonly<
+  Partial<Record<RecommendationReason['kind'], true>>
+> = {
+  ...functionalBassReasons,
+  fifths: true,
+  borrowed: true,
+  deceptive: true,
+};
+
+function interpretationIdentity(item: ChordRecommendation): string {
+  return item.reasons
+    .filter((reason) => interpretationReasons[reason.kind])
+    .map((reason) =>
+      'side' in reason ? `${reason.kind}:${reason.side}` : reason.kind,
+    )
+    .sort()
+    .join(',');
+}
+
+function soundingIdentity(chord: WesternChord): string {
+  // Adapter-local 12-EDO equality. Spelled harmonic identity remains separate;
+  // another temperament can supply different sounding equality at its boundary.
+  return voiceChord(chord)
+    .map((pitch) => chromaticPosition(pitch.position))
+    .sort((a, b) => a - b)
+    .join(',');
+}
+
+function hasSpelledRootBass(chord: WesternChord): boolean {
+  const bass = voiceChord(chord)[0];
+  return (
+    bass?.position.letter === chord.root.position.letter &&
+    bass.position.accidental === chord.root.position.accidental
+  );
+}
+
+function deduplicateEquivalentVoicings(
+  items: readonly ChordRecommendation[],
+): ChordRecommendation[] {
+  const kept: {
+    item: ChordRecommendation;
+    sound: string;
+    interpretation: string;
+    rootBass: boolean;
+  }[] = [];
+  for (const item of items) {
+    const candidate = {
+      item,
+      sound: soundingIdentity(item.chord),
+      interpretation: interpretationIdentity(item),
+      rootBass: hasSpelledRootBass(item.chord),
+    };
+    const duplicateIndex = kept.findIndex(
+      (existing) =>
+        existing.sound === candidate.sound &&
+        existing.interpretation === candidate.interpretation,
+    );
+    if (duplicateIndex < 0) {
+      kept.push(candidate);
+      continue;
+    }
+    const existing = kept[duplicateIndex]!;
+    if (
+      candidate.item.score > existing.item.score ||
+      (candidate.item.score === existing.item.score &&
+        candidate.rootBass &&
+        !existing.rootBass)
+    )
+      kept[duplicateIndex] = candidate;
+  }
+  return kept.map(({ item }) => item);
+}
+
 /** Pure, bounded conventional-tonal search. See docs/chord-recommendations.md for
  * score terms and limits. Scores are heuristic preferences, never probabilities.
  */
@@ -162,9 +243,13 @@ export function recommendChords(
         if (!before && !after && degree === 0 && keyFit(chord, key) === 3)
           relationships += 2;
         if (keyFit(chord, key) === 3) reasons.push({ kind: 'key-fit' });
-        // Parallel-minor mixture remains available, with a modest contextual bonus.
-        if (
+        // Parallel-minor mixture must fit the claimed source as a complete chord;
+        // checking only its root and third mislabels chromatic extensions.
+        const parallelMinorFit =
           key.mode === 'major' &&
+          keyFit(chord, { tonic: key.tonic, mode: 'minor' }) === 3;
+        if (
+          parallelMinorFit &&
           ((degree === 5 && hasInterval(chord, 3)) ||
             ([8, 10].includes(degree) && hasInterval(chord, 4)))
         ) {
@@ -222,6 +307,9 @@ export function recommendChords(
         components,
         reasons,
         score: Object.values(components).reduce((a, b) => a + b, 0),
+        preferRootBass: reasons.some(
+          (reason) => functionalBassReasons[reason.kind],
+        ),
       };
     })
     .sort((a, b) => b.score - a.score);
@@ -235,6 +323,7 @@ export function recommendChords(
         before ?? (target.kind === 'bass' ? original : undefined),
         after,
         fixedBass,
+        item.preferRootBass,
       );
       const voiceLeading = -0.65 * chosen.movement;
       return {
@@ -260,13 +349,15 @@ export function recommendChords(
             chromaticPosition(fixedBass.position)),
     );
 
+  const distinctVoicings = deduplicateEquivalentVoicings(voiced);
+
   // Greedy diversity reranking keeps useful alternatives across roots and pitch
   // sets. Stable catalogue order breaks exact ties; no randomness or mutation.
   const recommendations: ChordRecommendation[] = [];
-  while (recommendations.length < limit && voiced.length) {
+  while (recommendations.length < limit && distinctVoicings.length) {
     let bestIndex = 0;
     let bestScore = -Infinity;
-    for (const [candidateIndex, item] of voiced.entries()) {
+    for (const [candidateIndex, item] of distinctVoicings.entries()) {
       const repeatedRoots = recommendations.filter(
         (value) => pitchClass(value.chord.root) === pitchClass(item.chord.root),
       ).length;
@@ -288,7 +379,7 @@ export function recommendChords(
         bestIndex = candidateIndex;
       }
     }
-    const [chosen] = voiced.splice(bestIndex, 1);
+    const [chosen] = distinctVoicings.splice(bestIndex, 1);
     if (chosen) recommendations.push(chosen);
   }
   return { context, recommendations };

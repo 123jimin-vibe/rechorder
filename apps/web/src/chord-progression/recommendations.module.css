@@ -53,6 +53,12 @@
     display: flex;
   }
 }
+.suggestion {
+  min-inline-size: 0;
+  flex: 1;
+  position: relative;
+  display: flex;
+}
 .preview {
   min-inline-size: 0;
   flex: 1;
@@ -60,6 +66,7 @@
   align-content: center;
   text-align: start;
   gap: 0.125rem;
+  padding-block-end: 0.625rem;
   border-start-end-radius: 0;
   border-end-end-radius: 0;
   & strong {
@@ -72,6 +79,22 @@
     line-height: 1.25;
     min-block-size: 1.25em;
   }
+}
+.score {
+  position: absolute;
+  inset-inline: 0.5rem;
+  inset-block-end: 0.3125rem;
+  block-size: 0.1875rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--border);
+  pointer-events: none;
+}
+.scoreFill {
+  display: block;
+  block-size: 100%;
+  border-radius: inherit;
+  background: var(--accent);
 }
 .play {
   color: var(--accent);

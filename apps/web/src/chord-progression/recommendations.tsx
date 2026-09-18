@@ -158,6 +158,9 @@ export function Recommendations({
       ? result.context.hypotheses[0]?.key
       : undefined;
   const currentBass = rootLabel(voiceChord(candidate)[0]!.position);
+  const scores = result.recommendations.map((item) => item.score);
+  const highestScore = Math.max(...scores);
+  const lowestScore = Math.min(...scores);
   return (
     <section
       class={styles['panel']}
@@ -230,6 +233,14 @@ export function Recommendations({
         {result.recommendations.map((item, index) => {
           const symbol = chordSymbol(item.chord);
           const reasons = item.reasons.map(reasonLabel);
+          const relativeScore =
+            highestScore === lowestScore
+              ? 100
+              : Math.round(
+                  15 +
+                    (85 * (item.score - lowestScore)) /
+                      (highestScore - lowestScore),
+                );
           const primary =
             activeMode === 'bass'
               ? 'Same bass'
@@ -244,27 +255,43 @@ export function Recommendations({
                 ) ?? reasons[0]!);
           return (
             <li key={index}>
-              <button
-                type="button"
-                class={styles['preview']}
-                aria-label={`Preview ${symbol}`}
-                aria-pressed={
-                  preview?.result === result && preview.index === index
-                }
-                title={reasons.join(' · ')}
-                onClick={() => {
-                  setPreview({ result, index });
-                  onPreview(item.chord);
-                }}
-              >
-                <strong>
-                  <span aria-hidden="true" class={styles['play']}>
-                    ▶
-                  </span>{' '}
-                  <MusicalText text={symbol} />
-                </strong>
-                <small>{primary}</small>
-              </button>
+              <div className={styles['suggestion']}>
+                <button
+                  type="button"
+                  class={styles['preview']}
+                  aria-label={`Preview ${symbol}`}
+                  aria-pressed={
+                    preview?.result === result && preview.index === index
+                  }
+                  title={reasons.join(' · ')}
+                  onClick={() => {
+                    setPreview({ result, index });
+                    onPreview(item.chord);
+                  }}
+                >
+                  <strong>
+                    <span aria-hidden="true" class={styles['play']}>
+                      ▶
+                    </span>{' '}
+                    <MusicalText text={symbol} />
+                  </strong>
+                  <small>{primary}</small>
+                </button>
+                <span
+                  class={styles['score']}
+                  role="meter"
+                  aria-label={`Relative score for ${symbol}`}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={relativeScore}
+                  title={`Relative score ${relativeScore}/100 · heuristic ${item.score.toFixed(2)}`}
+                >
+                  <span
+                    class={styles['scoreFill']}
+                    style={{ inlineSize: `${relativeScore}%` }}
+                  />
+                </span>
+              </div>
               <button
                 type="button"
                 class={styles['apply']}

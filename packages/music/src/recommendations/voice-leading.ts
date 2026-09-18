@@ -45,6 +45,7 @@ export function chooseVoicing(
   before?: WesternChord,
   after?: WesternChord,
   fixedBass?: Pitch<WesternPosition>,
+  preferRootBass = false,
 ): { chord: WesternChord; movement: number } {
   const previous = before ? heights(before) : undefined;
   const following = after ? heights(after) : undefined;
@@ -77,7 +78,11 @@ export function chooseVoicing(
       // but a tiny root-position prior avoids gratuitous inversions on ties.
       const cost =
         movement +
-        (bass.kind === 'degree' && bass.degree !== 1 ? 0.35 : 0) +
+        (bass.kind === 'degree' && bass.degree !== 1
+          ? preferRootBass
+            ? 2
+            : 0.35
+          : 0) +
         (!previous && !following ? Math.abs(octave) : 0);
       if (!best || cost < best.cost) best = { chord: voiced, movement, cost };
     }

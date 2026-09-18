@@ -24,6 +24,27 @@ test('optional key settings stay silent; previews leave edits untouched and comm
     .getByRole('combobox', { name: 'Mode', exact: true })
     .selectOption('minor');
   expect(await page.evaluate(() => window.audioProbe.resumeCalls)).toBe(0);
+  const meters = panel.getByRole('meter', {
+    name: /^Relative score for /,
+  });
+  await expect(meters).toHaveCount(4);
+  const renderedScores = await meters.evaluateAll((items) =>
+    items.map((item) => ({
+      value: Number(item.getAttribute('aria-valuenow')),
+      width: Number.parseFloat(
+        (item.firstElementChild as HTMLElement).style.inlineSize,
+      ),
+    })),
+  );
+  expect(Math.max(...renderedScores.map(({ value }) => value))).toBe(100);
+  expect(new Set(renderedScores.map(({ value }) => value)).size).toBeGreaterThan(
+    1,
+  );
+  expect(
+    renderedScores.every(
+      ({ value, width }) => value >= 15 && value <= 100 && value === width,
+    ),
+  ).toBe(true);
   const before = await candidate.textContent();
   const preview = panel.getByRole('button', { name: /^Preview / }).first();
   const symbol = (await preview.getAttribute('aria-label'))!.replace(

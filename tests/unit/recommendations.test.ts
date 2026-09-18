@@ -255,4 +255,41 @@ describe('contextual recommendations', () => {
     expect(context.confident).toBe(true);
     expect(context.hypotheses[0]!.key.tonic.spelling).toBe('C♯4');
   });
+  it('removes duplicate sounds unless their functional interpretation differs', () => {
+    const result = recommendChords({
+      progression: [c('A', 'minor7'), c('G', 'major')],
+      target: { kind: 'insert', index: 1 },
+      key: key('C'),
+      limit: 24,
+    });
+    const interpretationsBySound = new Map<string, Set<string>>();
+    for (const item of result.recommendations) {
+      const sound = voiceChord(item.chord)
+        .map((pitch) => chromaticPosition(pitch.position))
+        .sort((a, b) => a - b)
+        .join(',');
+      const interpretation = item.reasons
+        .flatMap((reason) => {
+          switch (reason.kind) {
+            case 'dominant-resolution':
+            case 'leading-tone-resolution':
+            case 'ii-v':
+            case 'plagal':
+            case 'fifths':
+              return `${reason.kind}:${reason.side}`;
+            case 'borrowed':
+            case 'deceptive':
+              return reason.kind;
+            default:
+              return [];
+          }
+        })
+        .sort()
+        .join(',');
+      const existing = interpretationsBySound.get(sound);
+      expect(existing?.has(interpretation) ?? false).toBe(false);
+      if (existing) existing.add(interpretation);
+      else interpretationsBySound.set(sound, new Set([interpretation]));
+    }
+  });
 });
