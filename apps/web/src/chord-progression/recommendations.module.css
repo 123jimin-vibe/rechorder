@@ -84,15 +84,27 @@
   position: absolute;
   inset-inline: 0.5rem;
   inset-block-end: 0.3125rem;
+  display: block;
+  inline-size: auto;
   block-size: 0.1875rem;
   overflow: hidden;
+  appearance: none;
+  border: 0;
   border-radius: 999px;
   background: var(--border);
   pointer-events: none;
 }
-.scoreFill {
-  display: block;
+.score::-webkit-meter-bar {
   block-size: 100%;
+  border: 0;
+  border-radius: inherit;
+  background: var(--border);
+}
+.score::-webkit-meter-optimum-value {
+  border-radius: inherit;
+  background: var(--accent);
+}
+.score::-moz-meter-bar {
   border-radius: inherit;
   background: var(--accent);
 }

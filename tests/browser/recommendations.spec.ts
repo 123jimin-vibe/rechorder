@@ -29,20 +29,24 @@ test('optional key settings stay silent; previews leave edits untouched and comm
   });
   await expect(meters).toHaveCount(4);
   const renderedScores = await meters.evaluateAll((items) =>
-    items.map((item) => ({
-      value: Number(item.getAttribute('aria-valuenow')),
-      width: Number.parseFloat(
-        (item.firstElementChild as HTMLElement).style.inlineSize,
-      ),
-    })),
+    items.map((item) => {
+      const meter = item as HTMLMeterElement;
+      const bounds = meter.getBoundingClientRect();
+      return {
+        value: meter.value,
+        width: bounds.width,
+        height: bounds.height,
+      };
+    }),
   );
   expect(Math.max(...renderedScores.map(({ value }) => value))).toBe(100);
-  expect(new Set(renderedScores.map(({ value }) => value)).size).toBeGreaterThan(
-    1,
-  );
+  expect(
+    new Set(renderedScores.map(({ value }) => value)).size,
+  ).toBeGreaterThan(1);
   expect(
     renderedScores.every(
-      ({ value, width }) => value >= 15 && value <= 100 && value === width,
+      ({ value, width, height }) =>
+        value >= 15 && value <= 100 && width > 0 && height > 0,
     ),
   ).toBe(true);
   const before = await candidate.textContent();

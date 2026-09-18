@@ -277,20 +277,14 @@ export function Recommendations({
                   </strong>
                   <small>{primary}</small>
                 </button>
-                <span
+                <meter
                   class={styles['score']}
-                  role="meter"
                   aria-label={`Relative score for ${symbol}`}
-                  aria-valuemin={0}
-                  aria-valuemax={100}
-                  aria-valuenow={relativeScore}
+                  min={0}
+                  max={100}
+                  value={relativeScore}
                   title={`Relative score ${relativeScore}/100 · heuristic ${item.score.toFixed(2)}`}
-                >
-                  <span
-                    class={styles['scoreFill']}
-                    style={{ inlineSize: `${relativeScore}%` }}
-                  />
-                </span>
+                />
               </div>
               <button
                 type="button"
