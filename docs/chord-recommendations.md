@@ -15,6 +15,7 @@ const result = recommendChords({
   progression: [createChord('D', 'minor7'), createChord('G', 'dominant7')],
   target: { kind: 'insert', index: 2 },
   key: { tonic: roots.find((root) => root.id === 'C')!.pitch, mode: 'major' },
+  focus: 'dominant',
   limit: 4,
 });
 ```
@@ -22,27 +23,31 @@ const result = recommendChords({
 - `insert` places a recommendation before `index`; the progression length means append.
 - `replace` evaluates an existing index against both neighbors, excluding its old harmony from tonal inference.
 - `bass` accepts a candidate and an index at which it would replace a chord, or the progression length to follow the last chord. The candidate's actual lowest sounding pitch is preserved, including spelling and octave. Its bass must be a member of the recommended harmony; other roots and inversions are searched.
-- Omitting `key` permits uncertain major/minor inference. Explicit keys support all seven diatonic modes. `limit` defaults to four and accepts 0–24. Invalid indices and limits throw `RangeError`.
+- Omitting `key` permits uncertain major/minor inference. Explicit keys support all seven diatonic modes. `focus` keeps only chords that make one move relative to a neighbor (`dominant`, `ii-v`, `fifth-down`, `fifth-up`, `step`, `third`, `leading-tone`, `same-root`, `tritone`) or, with `color`, applied and borrowed harmony. `limit` defaults to four and accepts 0–24. Invalid indices and limits throw `RangeError`.
 - Inputs must be valid conventional chords. Results satisfy the editor's existing C1–B6, 16-note audition bounds. No audition duration is interpreted as musical rhythm.
+
+Companion exports: `chordRole(chord, key)` returns the Roman numeral, harmonic
+function and idiom prior of a chord in a key; `diatonicChord(key, degree, seventh?)`
+builds the triad or seventh on a scale degree (minor keys raise the leading tone
+for V and vii°); `motion(from, to)` names the root move between two chords.
 
 ## Ranking pipeline
 
-1. Read at most four chords on each side. Infer 24 major/minor hypotheses from harmonic tone coverage, recency, tonic evidence, and resolved dominants. Combine the three best hypotheses; weights are relative evidence, not calibrated probabilities. A possible key is exposed in the UI only with at least three distinct roots and a score margin of two. Explicit key/mode bypasses inference.
+1. Read at most four chords on each side. Infer 24 major/minor hypotheses from harmonic tone coverage, recency, resolved dominants and root-position tonic chords (an inverted chord is never tonic evidence; a key whose tonic never sounds in root position loses 0.8). Combine the three best hypotheses; weights are relative evidence, not calibrated probabilities. A possible key is exposed in the UI only with at least three distinct roots and a score margin of two. Explicit key/mode bypasses inference.
 2. Enumerate one spelling per pitch class across the basic and jazz catalogues. Prefer the chosen key's spelling and observed roots. Minor-key leading-tone roots receive the raised-seventh spelling. Remove the unchanged replacement and enforce any fixed bass.
-3. Score key fit, directed dominant/leading-tone resolution, ii–V motion, fifths/plagal relationships, shared tones, replacement similarity, and local chord density. Account for raised leading tones in minor dominants, applied dominants, parallel-minor mixture, and deceptive resolutions. Outside-scale notes reduce key fit but are never forbidden.
-4. Search concrete inversions and registers for the best 48 harmonic candidates (up to 72 for larger result limits). Minimize voice movement against both neighbors. A dynamic program matches ordered upper voices with no crossing or many-to-one matching; added/removed voices cost three semitones. Bass travel has a 1.3 multiplier. Unmatched voices model entering/leaving voices, not silent omissions from the returned chord. Fixed-bass search preserves the exact sounding bass register.
-5. Rerank greedily for variety, penalizing repeated roots and highly overlapping pitch sets. Stable catalogue order breaks ties. Returned `score` is the musical score before diversity reranking, so list order need not be numerically descending.
+3. Score each harmony (register-free):
+   - **Role** (×3): the idiom prior of the chord's key role, averaged over hypotheses — I, V, IV, vi, ii high; iii, vii° lower; applied dominants and leading-tone chords, parallel-mode mixture and ♭II as color; other chromatic chords near zero. Sus and power chords inherit 60 % of their degree's prior; augmented triads are color. Uncertain inference blends 15 % toward plain qualities; without any context plain qualities alone rank. The tonic gains 1 when starting a progression.
+   - **Motion** (×2 from the previous chord, ×1 into the next): root-move frequency — dominant 1 (0.9 without a seventh; a triad only counts as dominant when it has a seventh or the key hears it as dominant/applied), ii–V 0.9, leading tone 0.8, fifth down 0.7, fifth up 0.6, whole step 0.6, third 0.55, semitone 0.45, same root 0.4, tritone 0.2.
+   - **Voice leading** (×−1): symmetric nearest-tone distance between pitch-class sets, averaged over neighbors. Smoothness ranks harmonies; registers are chosen afterwards.
+   - **Complexity**: −0.55 per interval of density mismatch with the neighbor, −0.4 for ninths or added sixths the neighbor lacks, −0.4 per interval past the fifth, −3 for repeating a neighbor's harmony, −1.5 for repeating a neighbor's root, −1.5 for returning to the root heard two chords earlier.
+   - **Similarity** (replace only): 0.45 per tone shared with the replaced chord.
+   - A `focus` filters the pool before ranking.
+4. Voice the best 48 harmonies (up to 72 for larger limits). Detect a **bass line** from the two previous chords: an inverted chord starts one, two basses a step apart give it a direction, all register-free. With a line (or an inverted following chord) every inversion is tried and the bass continuing the line wins — 1 for a step in the line's direction, 0.5 against it, 0.25 for a leap, 0 for stalling; otherwise the root stays in the bass. The register then minimizes the ordered voice-matching distance (`voiceLeadingDistance`) against the neighbors. The bass-line value adds ×1.5, scaled by the harmony's role so a stepping bass cannot rescue an implausible chord. Fixed-bass search preserves the exact sounding bass register.
+5. Remove exact-sounding duplicates whose interpretation matches, then rerank greedily for variety: −1.5 per repeated root, −0.75 per repeated bass, −1 × the largest pitch-set overlap. Stable catalogue order breaks ties. Returned `score` is the musical score before diversity reranking, so list order need not be numerically descending.
 
-The named score components are intentionally inspectable. Explicit key fit is
-weighted more strongly than inference; directed resolutions dominate weak common
-tone matches; chord density discourages adding extensions just to increase overlap.
-The voicing movement penalty is 0.65 per normalized movement unit. This is a
-bounded heuristic search, not an exhaustive optimizer or trained model.
+Reasons carry the interpretation: `role` (numeral and function relative to a known key), `motion` (move and side), `bass-line`, `smooth-voices`, `fixed-bass`, `starting-point`. Weights are application design choices grounded in the progressions collected in `worklog/note/n0004-common-chord-progressions.md`; this is a bounded heuristic search, not an exhaustive optimizer or trained model.
 
-`tonality.ts`, `harmony.ts`, and `voice-leading.ts` own independent musical concerns;
-`recommend.ts` composes them. `inferTonality`, `scalePitches`, and
-`voiceLeadingDistance` are also public exports. The UI translates reason codes
-into short labels and memoizes results independently of sounding-note updates.
+`tonality.ts` (keys, roles, diatonic chords), `harmony.ts` (root motion) and `voice-leading.ts` (bass lines, registers) own independent musical concerns; `recommend.ts` composes them.
 
 ## Interaction
 
@@ -51,22 +56,32 @@ without changing either draft or timeline; the adjacent action commits directly.
 Next appends, Replace retains the selected ID, and Between inserts after the
 selection when it has a successor. Bass Use loads the candidate for the existing
 Append/Replace controls. Its inline bass picker avoids a trip to the lower editor.
-Settings never start audio. Whole-progression transposition carries an explicit
-tonic with it. Suggestion progression commits stop stale transport.
+Each suggestion shows its numeral (when the key is known) and strongest move; the
+full reason list is in the tooltip. A scrollable row of move chips (Any, V→I,
+ii–V, ↓5th, ↑5th, Step, 3rd, Color) narrows the list to one design move; chips are
+disabled before the first chord, and an empty result says no chord makes that move.
+
+The builder's **Function** pads design chords key-relatively: one pad per scale
+degree of the explicit or best inferred key (marked `?` while uncertain, assuming
+C major before any chord exists), showing numeral and symbol, with a `7` toggle for
+seventh chords. Tapping a pad auditions the chord as the candidate; Root, Bass and
+Chord type refine it as usual. Settings never start audio. Whole-progression
+transposition carries an explicit tonic with it. Suggestion progression commits
+stop stale transport.
 
 ## Limits and evidence
 
-This first implementation has no melody, rhythm, genre, phrase-goal, or explicit
-local modulation input. Auto inference considers major/minor only; select other
-modes explicitly. Borrowed chords and local tonicization are supported without
-claiming a definitive global key. Voicing search covers close-position inversions
-and register shifts, not every possible open voicing. Returned alternatives need
-human audition; a high score does not establish musical correctness.
+This implementation has no melody, rhythm, genre, phrase-goal, or explicit local
+modulation input. Auto inference considers major/minor only; select other modes
+explicitly. Borrowed chords and local tonicization are supported without claiming
+a definitive global key. Voicing search covers close-position inversions and
+register shifts, not every possible open voicing. Returned alternatives need human
+audition; a high score does not establish musical correctness.
 
 The harmonic vocabulary follows the relationships described in
 [Music Theory for the 21st-Century Classroom: Harmonic Function](https://musictheory.pugetsound.edu/mt21c/HarmonicFunction.html)
 and [Open Music Theory: Tonicization](https://viva.pressbooks.pub/openmusictheory/chapter/tonicization/).
-Numerical weights and search limits are application design choices, not claims
-from those sources. Focused tests cover cadences, insertion/replacement context,
-minor/applied dominants, uncertainty, fixed-bass register/spelling, determinism,
-and editor/browser commit boundaries.
+Focused tests cover cadences, bass-line continuation, focus filtering, roles and
+diatonic chords, insertion/replacement context, minor/applied dominants,
+uncertainty, fixed-bass register/spelling, determinism, and editor/browser commit
+boundaries.

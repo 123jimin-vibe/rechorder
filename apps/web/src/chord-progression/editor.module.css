@@ -449,6 +449,25 @@
     color: var(--muted);
   }
 }
+.functionPads {
+  & legend {
+    inline-size: 100%;
+  }
+  & .tonePads button {
+    flex-direction: column;
+    gap: 0;
+    min-inline-size: 3rem;
+    min-block-size: 2.75rem;
+    line-height: 1.15;
+    font-weight: 600;
+  }
+  & .tonePads small {
+    font-weight: 400;
+  }
+}
+.seventhToggle {
+  font-weight: 650;
+}
 .otherBass,
 .noteVoicing {
   & summary {

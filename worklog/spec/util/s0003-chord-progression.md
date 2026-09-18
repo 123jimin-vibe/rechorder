@@ -57,7 +57,7 @@ Supporting varied musical data does not require exposing these controls now.
 - In portrait, keep the candidate, audition and commit controls sticky within the builder so users can commit lower controls without scrolling back. Preserve normal document flow and keyboard visibility.
 - Group spacing and register controls under Voicing, with per-tone octave/mute/doubling controls in its disclosure. Keep common root/type/bass actions direct and compact; preserve candidate display geometry and avoid page overflow on portrait or zoom.
 - Group interval/direction and candidate/progression scope under Transpose; group enharmonic spelling there too. Candidate transforms audition without committing; progression transforms update entries without changing their IDs, stop stale transport, and transform the candidate consistently.
-- Contextual suggestions are governed by the section below; n0003 remains supporting research.
+- Contextual suggestions and harmonic design are governed by the sections below; n0003 and n0004 remain supporting research.
 
 ## Smart chord suggestions — t0025
 
@@ -71,7 +71,20 @@ Supporting varied musical data does not require exposing these controls now.
 - Add optional tonic and mode settings alongside BPM, initially Auto with no assumed key. Support major, minor and the remaining diatonic modes. Settings do not start audio or edit chords.
 - Whole-progression transposition also transposes an explicit tonic, preserving mode and spelling; candidate-only transposition leaves tonal settings intact.
 - Place one compact recommendation panel beside the timeline/builder, with Next, Replace, Between and Bass modes and four ranked choices. Next appends at the end; Replace targets the selected stored chord; Between inserts after the selection only when a following chord exists; Bass offers other chord types/roots over the candidate's sounding bass.
-- Disable unavailable targets. Show the target chords/bass and any sufficiently supported inferred key as a possibility. A suggestion's labelled preview auditions without editing the candidate or timeline. Its adjacent Add, Replace, Insert or Use action applies directly without an additional audition. Show a compact accessible bar for each suggestion's normalized relative heuristic score; present it as comparative ranking, not probability.
+- Disable unavailable targets. Show the target chords/bass and any sufficiently supported inferred key as a possibility. A suggestion's labelled preview auditions without editing the candidate or timeline. Its adjacent Add, Replace, Insert or Use action applies directly without an additional audition. Label each suggestion with its Roman numeral when the key is known and its strongest move (bass line or root move); keep the complete reason list in the tooltip. Show a compact accessible bar for each suggestion's normalized relative heuristic score; present it as comparative ranking, not probability.
 - Bass mode includes a direct bass picker that edits/auditions the candidate, keeping bass exploration inside the panel.
 - Next/Replace/Between commits load the chosen chord into the candidate and select the affected entry. Replacement keeps the entry ID; insertion preserves neighboring IDs. Bass Use loads the candidate for ordinary Append/Replace, preserving the bass pitch and register.
 - Suggestion commits that change the progression stop stale transport and affected auditions. An insertion reveals its new entry rather than scrolling to the end. Preserve the panel's layout while previewing, and use a two-column list on portrait with reachable touch targets and no page overflow.
+
+## Harmonic design — t0027
+
+### Principles
+
+- Let users design chords from theory — function, fifth progression, ii–V, stepwise or third-related roots, color — with standard shorthand instead of prose, and with the same audition-then-commit rhythm as the pads.
+- One key drives every design control: the explicit key, else the best inferred hypothesis marked `?`, else an assumed C major marked `?` before any chord exists. The first-chord suggestions use the same assumption.
+
+### Controls
+
+- **Function pads** sit above Root in the builder: one pad per scale degree of the design key showing numeral and chord symbol (minor keys use V and vii° with the raised leading tone), plus a `7` toggle switching the pads to diatonic sevenths. Tapping a pad auditions that chord as the candidate without committing; Root, Bass and Chord type refine it. The legend names the design key.
+- **Move chips** under the suggestion purposes: Any, V→I, ii–V, ↓5th, ↑5th, Step, 3rd and Color narrow the ranked list to chords making that move relative to the target's neighbors (Color keeps applied and borrowed harmony). Chips are disabled before the first chord; an empty result states that no chord makes the move. The row scrolls horizontally on narrow screens and keeps 44 px touch targets.
+- Check: pads reflect key and mode changes and the seventh toggle; a chip filters every listed suggestion; the panel still fits a 390 px portrait viewport above the fold with no page overflow.

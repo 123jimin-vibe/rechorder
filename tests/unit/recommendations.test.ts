@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
+  chordRole,
   chordSymbol,
   createChord,
+  diatonicChord,
   inferTonality,
   isAuditionable,
+  motion,
   recommendChords,
   roots,
   setToneVoicing,
@@ -12,7 +15,6 @@ import {
 } from '@rechorder/music';
 import type { TonalKey, WesternChord } from '@rechorder/music';
 import { chromaticPosition } from '../../packages/music/src/western';
-import { relation } from '../../packages/music/src/recommendations/harmony';
 
 const key = (id: string, mode: TonalKey['mode'] = 'major'): TonalKey => ({
   tonic: roots.find((root) => root.id === id)!.pitch,
@@ -23,15 +25,15 @@ const names = (chords: readonly { chord: WesternChord }[]) =>
   chords.map((item) => chordSymbol(item.chord));
 
 describe('contextual recommendations', () => {
-  it('distinguishes dominant sevenths from major sevenths in directed resolution', () => {
-    expect(relation(c('G', 'dominant7'), c('C', 'major'))?.kind).toBe(
-      'dominant-resolution',
-    );
-    expect(relation(c('G', 'major7'), c('C', 'major'))?.kind).not.toBe(
-      'dominant-resolution',
-    );
-    expect(relation(c('D', 'minorMajor7'), c('G', 'dominant7'))?.kind).not.toBe(
+  it('distinguishes dominant sevenths and ii–V from plain fifth motion', () => {
+    expect(motion(c('G', 'dominant7'), c('C', 'major')).move).toBe('dominant');
+    expect(motion(c('G', 'major7'), c('C', 'major')).move).toBe('fifth-down');
+    expect(motion(c('D', 'minor7'), c('G', 'dominant7')).move).toBe('ii-v');
+    expect(motion(c('D', 'minorMajor7'), c('G', 'dominant7')).move).not.toBe(
       'ii-v',
+    );
+    expect(motion(c('B', 'diminished'), c('C', 'major')).move).toBe(
+      'leading-tone',
     );
   });
   it('resolves ii–V toward tonic and supplies concrete voicings', () => {
@@ -42,8 +44,14 @@ describe('contextual recommendations', () => {
     });
     expect(result.recommendations[0]!.chord.root.spelling).toBe('C4');
     expect(result.recommendations[0]!.reasons).toContainEqual({
-      kind: 'dominant-resolution',
+      kind: 'motion',
+      move: 'dominant',
       side: 'before',
+    });
+    expect(result.recommendations[0]!.reasons).toContainEqual({
+      kind: 'role',
+      numeral: 'IΔ7',
+      function: 'tonic',
     });
     expect(
       result.recommendations.every((item) => isAuditionable(item.chord)),
@@ -61,9 +69,14 @@ describe('contextual recommendations', () => {
     });
     const best = result.recommendations[0]!;
     expect(best.chord.root.spelling).toBe('G4');
-    expect(best.reasons).toContainEqual({ kind: 'ii-v', side: 'before' });
     expect(best.reasons).toContainEqual({
-      kind: 'dominant-resolution',
+      kind: 'motion',
+      move: 'ii-v',
+      side: 'before',
+    });
+    expect(best.reasons).toContainEqual({
+      kind: 'motion',
+      move: 'dominant',
       side: 'after',
     });
   });
@@ -74,19 +87,89 @@ describe('contextual recommendations', () => {
       key: key('A', 'minor'),
     });
     expect(minor.recommendations[0]!.chord.root.spelling).toBe('E4');
-    expect(minor.recommendations[0]!.components.tonality).toBeGreaterThan(0);
+    expect(minor.recommendations[0]!.components.role).toBeGreaterThan(0);
     const applied = recommendChords({
       progression: [c('A', 'minor7'), c('G', 'major')],
       target: { kind: 'insert', index: 1 },
       key: key('C'),
     });
-    expect(
-      applied.recommendations.some(
-        (item) =>
-          item.chord.root.spelling === 'D4' &&
-          item.chord.definition.id === 'dominant7',
-      ),
-    ).toBe(true);
+    const secondary = applied.recommendations.find(
+      (item) =>
+        item.chord.root.spelling === 'D4' &&
+        item.chord.definition.id === 'dominant7',
+    );
+    expect(secondary?.reasons).toContainEqual({
+      kind: 'role',
+      numeral: 'V7/V',
+      function: 'applied',
+    });
+  });
+  it('continues a descending bass line with the next step rather than stalling', () => {
+    const result = recommendChords({
+      progression: [c('C', 'major'), c('E', 'minor', 'B')],
+      target: { kind: 'insert', index: 2 },
+      key: key('C'),
+    });
+    const symbols = names(result.recommendations);
+    expect(symbols[0]).toBe('Am');
+    expect(symbols).toContain('F/A');
+    for (const item of result.recommendations)
+      expect(voiceChord(item.chord)[0]!.position.letter).not.toBe('B');
+    expect(result.recommendations[0]!.reasons).toContainEqual({
+      kind: 'bass-line',
+    });
+    const continued = recommendChords({
+      progression: [c('C', 'major'), c('E', 'minor', 'B'), c('A', 'minor')],
+      target: { kind: 'insert', index: 3 },
+      key: key('C'),
+    });
+    expect(names(continued.recommendations)[0]).toBe('C/G');
+  });
+  it('keeps roots in the bass when no bass line is in progress', () => {
+    const result = recommendChords({
+      progression: [c('C', 'major')],
+      target: { kind: 'insert', index: 1 },
+      key: key('C'),
+      limit: 8,
+    });
+    for (const item of result.recommendations)
+      expect(voiceChord(item.chord)[0]!.position.letter).toBe(
+        item.chord.root.position.letter,
+      );
+    expect(names(result.recommendations)).not.toContain('C');
+  });
+  it('narrows to a requested move or to color harmony', () => {
+    const progression = [c('C', 'major'), c('E', 'minor', 'B')];
+    const iiV = recommendChords({
+      progression,
+      target: { kind: 'insert', index: 2 },
+      key: key('C'),
+      focus: 'ii-v',
+    });
+    expect(iiV.recommendations.length).toBeGreaterThan(0);
+    for (const item of iiV.recommendations) {
+      expect(item.chord.root.spelling).toBe('A4');
+      expect(item.reasons).toContainEqual({
+        kind: 'motion',
+        move: 'ii-v',
+        side: 'before',
+      });
+    }
+    const color = recommendChords({
+      progression,
+      target: { kind: 'insert', index: 2 },
+      key: key('C'),
+      focus: 'color',
+    });
+    expect(color.recommendations.length).toBeGreaterThan(0);
+    for (const item of color.recommendations)
+      expect(
+        item.reasons.some(
+          (reason) =>
+            reason.kind === 'role' &&
+            (reason.function === 'applied' || reason.function === 'borrowed'),
+        ),
+      ).toBe(true);
   });
   it('replaces using surrounding context without recommending the identical harmony', () => {
     const original = [c('D', 'minor7'), c('F♯', 'augmented'), c('C', 'major7')];
@@ -154,8 +237,13 @@ describe('contextual recommendations', () => {
       hypotheses: [{ key: explicit, weight: 1 }],
     });
     expect(
-      result.recommendations.every((item) => item.components.tonality > 0),
+      result.recommendations.every((item) => item.components.role > 0),
     ).toBe(true);
+  });
+  it('does not mistake an inverted mediant for a new tonic', () => {
+    const context = inferTonality([c('C', 'major'), c('E', 'minor', 'B')]);
+    expect(context.hypotheses[0]!.key).toMatchObject({ mode: 'major' });
+    expect(context.hypotheses[0]!.key.tonic.spelling).toBe('C4');
   });
   it('is deterministic, bounded to local context and validates target/limit boundaries', () => {
     const local = [
@@ -215,7 +303,6 @@ describe('contextual recommendations', () => {
       voiceLeadingDistance([48, 60, 64, 67], [48, 60, 64]),
     );
   });
-
   it('spells minor leading tones and keeps chromatic alternatives available', () => {
     const result = recommendChords({
       progression: [c('A', 'minor')],
@@ -235,11 +322,12 @@ describe('contextual recommendations', () => {
     });
     expect(
       borrowed.recommendations.some((item) =>
-        item.reasons.some((reason) => reason.kind === 'borrowed'),
+        item.reasons.some(
+          (reason) => reason.kind === 'role' && reason.function === 'borrowed',
+        ),
       ),
     ).toBe(true);
   });
-
   it('uses an explicit tonic as the first-chord anchor without deriving one from an empty draft', () => {
     const result = recommendChords({
       progression: [],
@@ -269,21 +357,15 @@ describe('contextual recommendations', () => {
         .sort((a, b) => a - b)
         .join(',');
       const interpretation = item.reasons
-        .flatMap((reason) => {
-          switch (reason.kind) {
-            case 'dominant-resolution':
-            case 'leading-tone-resolution':
-            case 'ii-v':
-            case 'plagal':
-            case 'fifths':
-              return `${reason.kind}:${reason.side}`;
-            case 'borrowed':
-            case 'deceptive':
-              return reason.kind;
-            default:
-              return [];
-          }
-        })
+        .flatMap((reason) =>
+          reason.kind === 'motion'
+            ? `${reason.move}:${reason.side}`
+            : reason.kind === 'role' &&
+                (reason.function === 'applied' ||
+                  reason.function === 'borrowed')
+              ? reason.numeral
+              : [],
+        )
         .sort()
         .join(',');
       const existing = interpretationsBySound.get(sound);
@@ -291,5 +373,83 @@ describe('contextual recommendations', () => {
       if (existing) existing.add(interpretation);
       else interpretationsBySound.set(sound, new Set([interpretation]));
     }
+  });
+});
+
+describe('key-relative roles and chords', () => {
+  it('labels diatonic, applied, borrowed and chromatic harmony', () => {
+    const major = key('C');
+    expect(chordRole(c('G', 'dominant7'), major)).toMatchObject({
+      numeral: 'V7',
+      function: 'dominant',
+    });
+    expect(chordRole(c('A', 'minor'), major).numeral).toBe('vi');
+    expect(chordRole(c('B', 'diminished'), major).numeral).toBe('vii°');
+    expect(chordRole(c('D', 'dominant7'), major)).toMatchObject({
+      numeral: 'V7/V',
+      function: 'applied',
+    });
+    expect(chordRole(c('C', 'dominant7'), major).numeral).toBe('V7/IV');
+    expect(chordRole(c('B♭', 'major'), major)).toMatchObject({
+      numeral: '♭VII',
+      function: 'borrowed',
+    });
+    expect(chordRole(c('F', 'minor'), major).numeral).toBe('iv');
+    expect(chordRole(c('D♭', 'dominant7'), major).function).toBe('chromatic');
+    expect(chordRole(c('F♯', 'major'), major).prior).toBe(0);
+    const minor = key('A', 'minor');
+    expect(chordRole(c('E', 'major'), minor)).toMatchObject({
+      numeral: 'V',
+      prior: 0.95,
+    });
+    expect(chordRole(c('G♯', 'diminished'), minor).numeral).toBe('vii°');
+    expect(chordRole(c('F', 'major'), minor).numeral).toBe('VI');
+    expect(chordRole(c('E', 'augmented'), minor).function).toBe('chromatic');
+    expect(chordRole(c('C', 'major'), major).prior).toBeGreaterThan(
+      chordRole(c('E', 'minor'), major).prior,
+    );
+  });
+  it('builds diatonic triads and sevenths with the minor leading tone', () => {
+    const names = (mode: TonalKey['mode'], seventh: boolean) =>
+      Array.from({ length: 7 }, (_, index) =>
+        chordSymbol(
+          diatonicChord(
+            key(mode === 'major' ? 'C' : 'A', mode),
+            index,
+            seventh,
+          ),
+        ),
+      );
+    expect(names('major', false)).toEqual([
+      'C',
+      'Dm',
+      'Em',
+      'F',
+      'G',
+      'Am',
+      'Bdim',
+    ]);
+    expect(names('major', true)).toEqual([
+      'Cmaj7',
+      'Dm7',
+      'Em7',
+      'Fmaj7',
+      'G7',
+      'Am7',
+      'Bm7♭5',
+    ]);
+    expect(names('minor', false)).toEqual([
+      'Am',
+      'Bdim',
+      'C',
+      'Dm',
+      'E',
+      'F',
+      'G♯dim',
+    ]);
+    expect(names('minor', true)[4]).toBe('E7');
+    expect(names('minor', true)[6]).toBe('G♯dim7');
+    expect(chordSymbol(diatonicChord(key('D', 'dorian'), 3))).toBe('G');
+    expect(() => diatonicChord(key('C'), 7)).toThrow(RangeError);
   });
 });

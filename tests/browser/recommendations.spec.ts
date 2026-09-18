@@ -241,3 +241,39 @@ test('suggestions fit mobile and enlarged text, with keyboard-accessible actions
   }
   expect(errors).toEqual([]);
 });
+
+test('function pads design key-relative chords and move chips narrow suggestions', async ({
+  page,
+}) => {
+  await page.addInitScript(installAudioProbe);
+  await page.goto('./chord-progression/');
+  const panel = page.getByRole('region', { name: 'Chord suggestions' });
+  const pads = page.locator('fieldset[aria-label="Function"]');
+  const candidate = page.getByLabel('Candidate chord');
+  await expect(pads.locator('legend')).toHaveText('Function C major?');
+  await expect(
+    panel.getByRole('button', { name: 'ii–V motion' }),
+  ).toBeDisabled();
+  await pads.getByRole('button', { name: 'Function V (G)' }).click();
+  await expect(candidate.locator('strong')).toHaveText('G');
+  await expect
+    .poll(() => page.evaluate(() => window.audioProbe.sources.length))
+    .toBeGreaterThan(0);
+  await pads.getByRole('button', { name: 'Seventh chords' }).click();
+  await pads.getByRole('button', { name: 'Function ii7 (Dm7)' }).click();
+  await expect(candidate.locator('strong')).toHaveText('Dm7');
+  await page.getByRole('button', { name: 'Append', exact: true }).click();
+  await page
+    .getByRole('combobox', { name: 'Key', exact: true })
+    .selectOption('C');
+  await expect(pads.locator('legend')).toHaveText('Function C major');
+  await panel.getByRole('button', { name: 'ii–V motion' }).click();
+  const previews = panel.getByRole('button', { name: /^Preview / });
+  await expect(previews.first()).toHaveAccessibleName('Preview G7');
+  for (const name of await previews.allInnerTexts())
+    expect(name).toContain('ii–V');
+  await panel.getByRole('button', { name: 'Dominant resolution' }).click();
+  await expect(panel.getByText('No chord makes this move here')).toBeVisible();
+  await panel.getByRole('button', { name: 'Any move' }).click();
+  await expect(previews.first()).toBeVisible();
+});

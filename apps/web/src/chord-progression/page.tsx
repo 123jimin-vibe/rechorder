@@ -10,6 +10,7 @@ import {
   chordSymbol,
   createChord,
   chooseChord,
+  inferTonality,
   transposeChord,
   transposePitch,
   isAuditionable,
@@ -30,6 +31,7 @@ import {
   TransformOptions,
 } from './manipulation-options';
 import { ProgressionSettings } from './settings';
+import { FunctionPads } from './function-pads';
 import { Recommendations } from './recommendations';
 import type { SuggestionMode } from './recommendations';
 import { MusicalText } from './musical-text';
@@ -48,6 +50,11 @@ export function EditorPage({
   const progression = useMemo(
     () => state.entries.map((entry) => entry.value),
     [state.entries],
+  );
+  // Same window the Next suggestions read, so pads and panel agree on the key.
+  const tonalContext = useMemo(
+    () => inferTonality(progression.slice(-4), tonalKey),
+    [progression, tonalKey],
   );
   const insertedId = useRef<string | null>(null);
   const previousLength = useRef(0);
@@ -358,7 +365,15 @@ export function EditorPage({
           </div>
         </div>
         <div class={styles['choices']}>
-          <fieldset class={styles['choiceGroup']} aria-label="Root and bass">
+          <fieldset
+            class={styles['choiceGroup']}
+            aria-label="Function, root and bass"
+          >
+            <FunctionPads
+              context={tonalContext}
+              candidate={candidate}
+              onChoose={auditionCandidate}
+            />
             <fieldset>
               <legend>Root</legend>
               <div class={styles['roots']}>

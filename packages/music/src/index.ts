@@ -59,6 +59,7 @@ export { recommendChords } from './recommendations/recommend';
 export type {
   RecommendationTarget,
   RecommendationRequest,
+  RecommendationFocus,
   RecommendationReason,
   RecommendationScore,
   ChordRecommendation,
@@ -68,11 +69,17 @@ export {
   tonalModes,
   inferTonality,
   scalePitches,
+  chordRole,
+  diatonicChord,
 } from './recommendations/tonality';
 export type {
   TonalMode,
   TonalKey,
   TonalContext,
   TonalHypothesis,
+  ChordRole,
+  HarmonicFunction,
 } from './recommendations/tonality';
+export { motion } from './recommendations/harmony';
+export type { Move, Motion } from './recommendations/harmony';
 export { voiceLeadingDistance } from './recommendations/voice-leading';

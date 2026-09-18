@@ -1,7 +1,7 @@
 import { useState } from 'preact/hooks';
 import { rootLabel, roots, tonalModes } from '@rechorder/music';
 import type { TonalKey, TonalMode } from '@rechorder/music';
-import { modeLabels } from './recommendations';
+import { modeLabels } from './tonal-context';
 import { tempoLimits } from '../audio/audition';
 import type { AuditionController } from '../audio/audition';
 import styles from './editor.module.css';

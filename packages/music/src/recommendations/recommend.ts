@@ -6,19 +6,22 @@ import {
   chromaticPosition,
 } from '../western';
 import { isAuditionable, voiceChord } from '../chord-manipulation';
-import type { TonalContext, TonalKey } from './tonality';
-import { inferTonality, keyFit, recommendationRoots } from './tonality';
-import type { Relation } from './harmony';
+import type { HarmonicFunction, TonalContext, TonalKey } from './tonality';
+import { chordRole, inferTonality, recommendationRoots } from './tonality';
+import type { Move } from './harmony';
 import {
   commonToneCount,
   hasInterval,
-  mod12,
+  hasThird,
+  motion,
   pitchClass,
   pitchClasses,
-  relation,
-  tendencyResolution,
 } from './harmony';
-import { chooseVoicing } from './voice-leading';
+import {
+  chooseVoicing,
+  detectBassLine,
+  pitchClassMovement,
+} from './voice-leading';
 
 export type RecommendationTarget =
   | { readonly kind: 'insert'; readonly index: number }
@@ -28,31 +31,39 @@ export type RecommendationTarget =
       readonly chord: WesternChord;
       readonly index: number;
     };
+/** A design focus narrows results to one kind of move; `color` keeps applied and
+ * borrowed harmony only.
+ */
+export type RecommendationFocus = Move | 'color';
 export interface RecommendationRequest {
   readonly progression: readonly WesternChord[];
   readonly target: RecommendationTarget;
   readonly key?: TonalKey;
+  readonly focus?: RecommendationFocus;
   readonly limit?: number;
 }
 export type RecommendationReason =
-  | { readonly kind: Relation; readonly side: 'before' | 'after' }
+  | {
+      readonly kind: 'role';
+      readonly numeral: string;
+      readonly function: HarmonicFunction;
+    }
+  | {
+      readonly kind: 'motion';
+      readonly move: Move;
+      readonly side: 'before' | 'after';
+    }
   | {
       readonly kind:
-        | 'key-fit'
-        | 'borrowed'
-        | 'deceptive'
-        | 'fixed-bass'
-        | 'smooth-voices'
-        | 'shared-tones'
-        | 'starting-point';
+        'bass-line' | 'fixed-bass' | 'smooth-voices' | 'starting-point';
     };
 export interface RecommendationScore {
-  readonly tonality: number;
-  readonly relationships: number;
-  readonly commonTones: number;
+  readonly role: number;
+  readonly motion: number;
+  readonly bassLine: number;
+  readonly voiceLeading: number;
   readonly similarity: number;
   readonly complexity: number;
-  readonly voiceLeading: number;
 }
 export interface ChordRecommendation {
   readonly chord: WesternChord;
@@ -65,38 +76,29 @@ export interface RecommendationResult {
   readonly recommendations: readonly ChordRecommendation[];
 }
 
-function harmonicIdentity(chord: WesternChord): string {
-  return (
-    pitchClass(chord.root) +
-    ':' +
-    pitchClasses(chord)
-      .sort((a, b) => a - b)
-      .join(',')
+const harmonicIdentity = (chord: WesternChord) =>
+  pitchClass(chord.root) +
+  ':' +
+  pitchClasses(chord)
+    .sort((a, b) => a - b)
+    .join(',');
+/** Ninths and beyond, plus added sixths, are colour that neighbors must justify. */
+const isExtended = (chord: WesternChord) =>
+  chord.definition.intervals.some(
+    (value) =>
+      value.chromaticSteps > 12 ||
+      (value.diatonicSteps === 5 && value.chromaticSteps === 9),
   );
-}
-
-const functionalBassReasons: Readonly<
-  Partial<Record<RecommendationReason['kind'], true>>
-> = {
-  'dominant-resolution': true,
-  'leading-tone-resolution': true,
-  'ii-v': true,
-  plagal: true,
-};
-const interpretationReasons: Readonly<
-  Partial<Record<RecommendationReason['kind'], true>>
-> = {
-  ...functionalBassReasons,
-  fifths: true,
-  borrowed: true,
-  deceptive: true,
-};
 
 function interpretationIdentity(item: ChordRecommendation): string {
   return item.reasons
-    .filter((reason) => interpretationReasons[reason.kind])
-    .map((reason) =>
-      'side' in reason ? `${reason.kind}:${reason.side}` : reason.kind,
+    .flatMap((reason) =>
+      reason.kind === 'motion'
+        ? [`${reason.move}:${reason.side}`]
+        : reason.kind === 'role' &&
+            (reason.function === 'applied' || reason.function === 'borrowed')
+          ? [reason.numeral]
+          : [],
     )
     .sort()
     .join(',');
@@ -156,13 +158,22 @@ function deduplicateEquivalentVoicings(
   return kept.map(({ item }) => item);
 }
 
+/** Without tonal context, plain qualities are the safer starting point. */
+function qualityPrior(chord: WesternChord): number {
+  if (!hasThird(chord)) return 0.3;
+  if (hasInterval(chord, 3) && hasInterval(chord, 6)) return 0.35;
+  if (hasInterval(chord, 10) || hasInterval(chord, 11))
+    return hasInterval(chord, 4) && hasInterval(chord, 10) ? 0.6 : 0.5;
+  return hasInterval(chord, 4) ? 1 : 0.85;
+}
+
 /** Pure, bounded conventional-tonal search. See docs/chord-recommendations.md for
  * score terms and limits. Scores are heuristic preferences, never probabilities.
  */
 export function recommendChords(
   request: RecommendationRequest,
 ): RecommendationResult {
-  const { progression, target } = request;
+  const { progression, target, focus } = request;
   const { index } = target;
   if (
     !Number.isInteger(index) ||
@@ -178,6 +189,7 @@ export function recommendChords(
     );
   const replaces = target.kind !== 'insert';
   const before = progression[index - 1];
+  const earlier = progression[index - 2];
   const after = progression[index + Number(replaces)];
   const original =
     target.kind === 'bass'
@@ -195,9 +207,12 @@ export function recommendChords(
   ];
   const context = inferTonality(local, request.key);
   if (!limit) return { context, recommendations: [] };
+  const known = context.source === 'explicit' || context.confident;
+  const primaryKey = known ? context.hypotheses[0]?.key : undefined;
   const fixedBass =
     target.kind === 'bass' ? voiceChord(target.chord)[0] : undefined;
   const neighbor = before ?? after ?? original;
+  const line = detectBassLine(before, earlier);
   const vocabulary = [...chordDefinitions, ...jazzDefinitions];
   const roots = recommendationRoots(context, [
     ...local,
@@ -219,98 +234,111 @@ export function recommendChords(
     })
     .map((chord) => {
       const reasons: RecommendationReason[] = [];
-      const tonality =
-        context.hypotheses.reduce(
-          (sum, hypothesis) =>
-            sum + keyFit(chord, hypothesis.key) * hypothesis.weight,
-          0,
-        ) * (context.source === 'explicit' ? 1.5 : context.confident ? 1 : 0.5);
-      let relationships = 0;
+      // Idiom frequency of the chord's key role, averaged over hypotheses. Uncertain
+      // context blends toward plain qualities instead of trusting one key.
+      const weightedPrior = context.hypotheses.reduce(
+        (sum, hypothesis) =>
+          sum + chordRole(chord, hypothesis.key).prior * hypothesis.weight,
+        0,
+      );
+      const role =
+        3 *
+          (known
+            ? weightedPrior
+            : context.hypotheses.length
+              ? 0.85 * weightedPrior + 0.15 * qualityPrior(chord)
+              : 0.4 * qualityPrior(chord)) +
+        (primaryKey &&
+        !before &&
+        !after &&
+        pitchClass(chord.root) === pitchClass(primaryKey.tonic) &&
+        chordRole(chord, primaryKey).function === 'tonic'
+          ? 1
+          : 0);
+      if (primaryKey) {
+        const interpretation = chordRole(chord, primaryKey);
+        reasons.push({
+          kind: 'role',
+          numeral: interpretation.numeral,
+          function: interpretation.function,
+        });
+      }
+      let motionScore = 0;
+      let voiceLeading = 0;
       for (const side of ['before', 'after'] as const) {
         const adjacent = side === 'before' ? before : after;
         if (!adjacent) continue;
+        const raw =
+          side === 'before' ? motion(adjacent, chord) : motion(chord, adjacent);
         const from = side === 'before' ? adjacent : chord;
-        const to = side === 'before' ? chord : adjacent;
-        const connection = relation(from, to);
-        if (connection) {
-          relationships += connection.score + tendencyResolution(from, to);
-          reasons.push({ kind: connection.kind, side });
-        }
+        // A triad a fifth above is only a dominant when it carries a seventh or the
+        // key hears it as one; otherwise I–IV is fifth motion, not a resolution.
+        const step =
+          raw.move === 'dominant' &&
+          !hasInterval(from, 10) &&
+          !(
+            primaryKey &&
+            ['dominant', 'applied'].includes(
+              chordRole(from, primaryKey).function,
+            )
+          )
+            ? { move: 'fifth-down' as const, strength: 0.7 }
+            : raw;
+        motionScore += (side === 'before' ? 2 : 1) * step.strength;
+        reasons.push({ kind: 'motion', move: step.move, side });
+        voiceLeading -= pitchClassMovement(adjacent, chord);
       }
-      const key = context.hypotheses[0]?.key;
-      if (key && (context.source === 'explicit' || context.confident)) {
-        const degree = mod12(pitchClass(chord.root) - pitchClass(key.tonic));
-        if (!before && !after && degree === 0 && keyFit(chord, key) === 3)
-          relationships += 2;
-        if (keyFit(chord, key) === 3) reasons.push({ kind: 'key-fit' });
-        // Parallel-minor mixture must fit the claimed source as a complete chord;
-        // checking only its root and third mislabels chromatic extensions.
-        const parallelMinorFit =
-          key.mode === 'major' &&
-          keyFit(chord, { tonic: key.tonic, mode: 'minor' }) === 3;
-        if (
-          parallelMinorFit &&
-          ((degree === 5 && hasInterval(chord, 3)) ||
-            ([8, 10].includes(degree) && hasInterval(chord, 4)))
-        ) {
-          relationships += 2;
-          reasons.push({ kind: 'borrowed' });
-        }
-        if (
-          before &&
-          (key.mode === 'major' || key.mode === 'minor') &&
-          mod12(pitchClass(before.root) - pitchClass(key.tonic)) === 7 &&
-          hasInterval(before, 4) &&
-          degree === (key.mode === 'minor' ? 8 : 9) &&
-          hasInterval(chord, key.mode === 'minor' ? 4 : 3)
-        ) {
-          relationships += 4;
-          reasons.push({ kind: 'deceptive' });
-        }
-      }
-      const adjacent = [before, after].filter(
-        (value): value is WesternChord => !!value,
-      );
-      const commonTones = adjacent.reduce(
-        (sum, value) =>
-          sum +
-          commonToneCount(chord, value) /
-            Math.max(pitchClasses(chord).length, pitchClasses(value).length),
-        0,
-      );
-      if (commonTones >= 0.5) reasons.push({ kind: 'shared-tones' });
+      voiceLeading /= Number(!!before) + Number(!!after) || 1;
       const similarity = original ? commonToneCount(chord, original) * 0.45 : 0;
-      // Match the local vocabulary's density; do not let extensions win merely by
-      // containing more common tones. Penalize repeated harmony on a continuation.
+      // Match the local vocabulary's density; penalize repeating recent harmony.
       const density = neighbor?.definition.intervals.length ?? 3;
+      const identity = harmonicIdentity(chord);
+      const repeats = (value: WesternChord | undefined) =>
+        !value
+          ? 0
+          : identity === harmonicIdentity(value)
+            ? 3
+            : pitchClass(value.root) === pitchClass(chord.root)
+              ? 1.5
+              : 0;
       const complexity =
         -0.55 * Math.abs(chord.definition.intervals.length - density) -
-        (before && harmonicIdentity(chord) === harmonicIdentity(before)
-          ? 3
+        (isExtended(chord) && !(neighbor && isExtended(neighbor)) ? 0.4 : 0) -
+        repeats(before) -
+        repeats(after) -
+        (earlier && pitchClass(earlier.root) === pitchClass(chord.root)
+          ? 1.5
           : 0) -
-        (after && harmonicIdentity(chord) === harmonicIdentity(after) ? 3 : 0) -
         (chord.definition.intervals.length > 5
           ? 0.4 * (chord.definition.intervals.length - 5)
           : 0);
       if (fixedBass) reasons.unshift({ kind: 'fixed-bass' });
       if (!reasons.length) reasons.push({ kind: 'starting-point' });
-      const components = {
-        tonality,
-        relationships,
-        commonTones,
-        similarity,
-        complexity,
-        voiceLeading: 0,
-      };
       return {
         chord,
-        components,
         reasons,
-        score: Object.values(components).reduce((a, b) => a + b, 0),
-        preferRootBass: reasons.some(
-          (reason) => functionalBassReasons[reason.kind],
-        ),
+        components: {
+          role,
+          motion: motionScore,
+          bassLine: 0,
+          voiceLeading,
+          similarity,
+          complexity,
+        },
+        score: role + motionScore + voiceLeading + similarity + complexity,
       };
+    })
+    .filter((item) => {
+      if (!focus) return true;
+      if (focus === 'color')
+        return item.reasons.some(
+          (reason) =>
+            reason.kind === 'role' &&
+            (reason.function === 'applied' || reason.function === 'borrowed'),
+        );
+      return item.reasons.some(
+        (reason) => reason.kind === 'motion' && reason.move === focus,
+      );
     })
     .sort((a, b) => b.score - a.score);
 
@@ -323,22 +351,26 @@ export function recommendChords(
         before ?? (target.kind === 'bass' ? original : undefined),
         after,
         fixedBass,
-        item.preferRootBass,
+        line,
       );
-      const voiceLeading = -0.65 * chosen.movement;
+      // A stepping bass helps a plausible chord; it does not rescue an implausible one.
+      const bassLine =
+        1.5 * chosen.bassLine * Math.min(1, item.components.role / 2.4);
+      const reasons = [
+        ...(chosen.bassLine >= 0.75 ? [{ kind: 'bass-line' } as const] : []),
+        ...item.reasons,
+        ...(item.components.voiceLeading >= -0.7 && neighbor
+          ? [{ kind: 'smooth-voices' } as const]
+          : []),
+      ];
       return {
         chord: chosen.chord,
-        score: item.score + voiceLeading,
-        components: { ...item.components, voiceLeading },
+        score: item.score + bassLine,
+        components: { ...item.components, bassLine },
         reasons:
-          chosen.movement <= 2 && neighbor
-            ? [
-                ...item.reasons.filter(
-                  (reason) => reason.kind !== 'starting-point',
-                ),
-                { kind: 'smooth-voices' },
-              ]
-            : item.reasons,
+          reasons.length > 1
+            ? reasons.filter((reason) => reason.kind !== 'starting-point')
+            : reasons,
       };
     })
     .filter(
@@ -351,29 +383,32 @@ export function recommendChords(
 
   const distinctVoicings = deduplicateEquivalentVoicings(voiced);
 
-  // Greedy diversity reranking keeps useful alternatives across roots and pitch
-  // sets. Stable catalogue order breaks exact ties; no randomness or mutation.
+  // Greedy diversity reranking keeps useful alternatives across roots, basses and
+  // pitch sets. Stable catalogue order breaks exact ties; no randomness or mutation.
   const recommendations: ChordRecommendation[] = [];
   while (recommendations.length < limit && distinctVoicings.length) {
     let bestIndex = 0;
     let bestScore = -Infinity;
     for (const [candidateIndex, item] of distinctVoicings.entries()) {
-      const repeatedRoots = recommendations.filter(
-        (value) => pitchClass(value.chord.root) === pitchClass(item.chord.root),
-      ).length;
-      const overlap = recommendations.reduce(
-        (max, value) =>
-          Math.max(
-            max,
-            commonToneCount(value.chord, item.chord) /
-              Math.max(
-                pitchClasses(value.chord).length,
-                pitchClasses(item.chord).length,
-              ),
-          ),
-        0,
-      );
-      const score = item.score - repeatedRoots * 4 - overlap * 1.5;
+      const bass = pitchClass(voiceChord(item.chord)[0]!);
+      let repeatedRoots = 0;
+      let repeatedBasses = 0;
+      let overlap = 0;
+      for (const value of recommendations) {
+        if (pitchClass(value.chord.root) === pitchClass(item.chord.root))
+          repeatedRoots++;
+        if (pitchClass(voiceChord(value.chord)[0]!) === bass) repeatedBasses++;
+        overlap = Math.max(
+          overlap,
+          commonToneCount(value.chord, item.chord) /
+            Math.max(
+              pitchClasses(value.chord).length,
+              pitchClasses(item.chord).length,
+            ),
+        );
+      }
+      const score =
+        item.score - repeatedRoots * 1.5 - repeatedBasses * 0.75 - overlap;
       if (score > bestScore) {
         bestScore = score;
         bestIndex = candidateIndex;

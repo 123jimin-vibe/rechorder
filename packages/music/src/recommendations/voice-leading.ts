@@ -7,6 +7,7 @@ import {
   setBass,
   voiceChord,
 } from '../chord-manipulation';
+import { mod12, pitchClass, pitchClasses } from './harmony';
 
 /** Ordered minimum-cost voice matching: no crossings or many-to-one shortcuts.
  * Unmatched voices cost three semitones; bass motion is evaluated separately.
@@ -37,26 +38,113 @@ export function voiceLeadingDistance(
   );
 }
 
+/** Signed nearest interval between pitch classes, −6..5 semitones. */
+const nearest = (from: number, to: number) => {
+  const up = mod12(to - from);
+  return up > 6 ? up - 12 : up;
+};
+
+/** Register-free smoothness: average distance from each tone to the nearest tone
+ * of the other chord, in both directions. Ranks harmonies; concrete registers
+ * are chosen afterwards.
+ */
+export function pitchClassMovement(a: WesternChord, b: WesternChord): number {
+  const from = pitchClasses(a);
+  const to = pitchClasses(b);
+  const toward = (source: readonly number[], target: readonly number[]) =>
+    source.reduce(
+      (sum, value) =>
+        sum +
+        Math.min(...target.map((other) => Math.abs(nearest(value, other)))),
+      0,
+    );
+  return (toward(from, to) + toward(to, from)) / (from.length + to.length);
+}
+
 const heights = (chord: WesternChord) =>
   voiceChord(chord).map((pitch) => chromaticPosition(pitch.position));
+const bassClass = (chord: WesternChord) => pitchClass(voiceChord(chord)[0]!);
 
+/** A stepwise bass line in progress. `direction` is the sign of the last step, or
+ * 0 when only an inversion signals that the bass is meant to move.
+ */
+export interface BassLine {
+  readonly direction: -1 | 0 | 1;
+}
+
+/** Detect a bass line from the two chords before a position. An inverted chord
+ * starts a line; two basses a step apart give it a direction. Register is
+ * ignored: a bass heard as C then B is a step regardless of octave placement.
+ */
+export function detectBassLine(
+  before: WesternChord | undefined,
+  earlier: WesternChord | undefined,
+): BassLine | undefined {
+  if (!before) return undefined;
+  if (earlier) {
+    const step = nearest(bassClass(earlier), bassClass(before));
+    if (Math.abs(step) === 1 || Math.abs(step) === 2)
+      return { direction: step > 0 ? 1 : -1 };
+  }
+  return bassClass(before) === pitchClass(before.root)
+    ? undefined
+    : { direction: 0 };
+}
+
+/** 1 for a step continuing the line, 0.5 for a step against it, 0.25 for a leap,
+ * 0 for a bass that stalls.
+ */
+function bassStep(from: number, to: number, direction: number): number {
+  const step = nearest(from, to);
+  if (step === 0) return 0;
+  if (Math.abs(step) > 2) return 0.25;
+  return direction === 0 || Math.sign(step) === direction ? 1 : 0.5;
+}
+
+export interface Voicing {
+  readonly chord: WesternChord;
+  /** 0–1 bass-line continuation, or 0 without a line. */
+  readonly bassLine: number;
+  /** Register-aware movement of the chosen voicing against the neighbors. */
+  readonly movement: number;
+}
+
+/** Choose the bass, then the register. Inversions need a reason: a bass line in
+ * progress, a following inverted chord, or a fixed bass. Otherwise the root
+ * stays in the bass and only the octave adapts to the neighbors.
+ */
 export function chooseVoicing(
   chord: WesternChord,
   before?: WesternChord,
   after?: WesternChord,
   fixedBass?: Pitch<WesternPosition>,
-  preferRootBass = false,
-): { chord: WesternChord; movement: number } {
+  line?: BassLine,
+): Voicing {
   const previous = before ? heights(before) : undefined;
   const following = after ? heights(after) : undefined;
+  const afterInverted = after && bassClass(after) !== pitchClass(after.root);
+  const bassValue = (bass: number) => {
+    const sides = [
+      ...(line && before
+        ? [bassStep(bassClass(before), bass, line.direction)]
+        : []),
+      ...((line || afterInverted) && after
+        ? [bassStep(bass, bassClass(after), line?.direction ?? 0)]
+        : []),
+    ];
+    return sides.length ? sides.reduce((a, b) => a + b, 0) / sides.length : 0;
+  };
   const basses = fixedBass
     ? [{ kind: 'pitch' as const, pitch: fixedBass }]
-    : chordTones(chord)
-        .filter((tone) => tone.degree <= 7)
-        .map((tone) => ({ kind: 'degree' as const, degree: tone.degree }));
-  let best: { chord: WesternChord; movement: number; cost: number } | undefined;
+    : line || afterInverted
+      ? chordTones(chord)
+          .filter((tone) => tone.degree <= 7)
+          .map((tone) => ({ kind: 'degree' as const, degree: tone.degree }))
+      : [{ kind: 'degree' as const, degree: 1 }];
+  let best: (Voicing & { readonly cost: number }) | undefined;
   for (const bass of basses) {
     const inversion = setBass(chord, bass);
+    const bassLine = bassValue(bassClass(inversion));
     const initialBass = heights(inversion)[0]!;
     const fixedOctave = fixedBass
       ? (chromaticPosition(fixedBass.position) - initialBass) / 12
@@ -74,18 +162,16 @@ export function chooseVoicing(
         ((previous ? voiceLeadingDistance(previous, notes) : 0) +
           (following ? voiceLeadingDistance(notes, following) : 0)) /
         (Number(!!previous) + Number(!!following) || 1);
-      // Without neighbors, prefer the ordinary register; inversions remain options,
-      // but a tiny root-position prior avoids gratuitous inversions on ties.
+      // The bass line decides the inversion; register then follows the neighbors.
+      // Ties keep the root in the bass; alone, the home octave.
       const cost =
+        -100 * bassLine +
         movement +
-        (bass.kind === 'degree' && bass.degree !== 1
-          ? preferRootBass
-            ? 2
-            : 0.35
-          : 0) +
+        (bass.kind === 'degree' && bass.degree !== 1 ? 10 : 0) +
         (!previous && !following ? Math.abs(octave) : 0);
-      if (!best || cost < best.cost) best = { chord: voiced, movement, cost };
+      if (!best || cost < best.cost)
+        best = { chord: voiced, bassLine, movement, cost };
     }
   }
-  return best ?? { chord, movement: 24 };
+  return best ?? { chord, bassLine: 0, movement: 24 };
 }

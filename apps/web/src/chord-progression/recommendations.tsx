@@ -9,24 +9,16 @@ import {
   voiceChord,
 } from '@rechorder/music';
 import type {
+  RecommendationFocus,
   RecommendationReason,
   TonalKey,
-  TonalMode,
   WesternChord,
 } from '@rechorder/music';
 import { MusicalText } from './musical-text';
+import { assumedKey, modeLabels } from './tonal-context';
 import styles from './recommendations.module.css';
 
 export type SuggestionMode = 'next' | 'replace' | 'between' | 'bass';
-export const modeLabels: Readonly<Record<TonalMode, string>> = {
-  major: 'Major',
-  minor: 'Minor',
-  dorian: 'Dorian',
-  phrygian: 'Phrygian',
-  lydian: 'Lydian',
-  mixolydian: 'Mixolydian',
-  locrian: 'Locrian',
-};
 const labels = {
   next: 'Next',
   replace: 'Replace',
@@ -45,33 +37,55 @@ const modeNames = {
   between: 'Suggest between chords',
   bass: 'Suggest chords for bass',
 } as const;
+/** Design moves; theory shorthand keeps labels short on narrow screens. */
+const focusLabels: Readonly<Record<RecommendationFocus, string>> = {
+  dominant: 'V→I',
+  'ii-v': 'ii–V',
+  'fifth-down': '↓5th',
+  'fifth-up': '↑5th',
+  step: 'Step',
+  third: '3rd',
+  color: 'Color',
+  'leading-tone': 'Leading tone',
+  'same-root': 'Same root',
+  tritone: 'Tritone',
+};
+const focusNames: Readonly<Record<RecommendationFocus, string>> = {
+  dominant: 'Dominant resolution',
+  'ii-v': 'ii–V motion',
+  'fifth-down': 'Fifth down',
+  'fifth-up': 'Fifth up',
+  step: 'Stepwise root',
+  third: 'Third-related root',
+  color: 'Applied or borrowed color',
+  'leading-tone': 'Leading-tone resolution',
+  'same-root': 'Same root',
+  tritone: 'Tritone root',
+};
+const focusChoices: readonly RecommendationFocus[] = [
+  'dominant',
+  'ii-v',
+  'fifth-down',
+  'fifth-up',
+  'step',
+  'third',
+  'color',
+];
 
 function reasonLabel(reason: RecommendationReason): string {
   switch (reason.kind) {
-    case 'dominant-resolution':
-      return reason.side === 'after' ? 'Leads to next' : 'Dominant resolution';
-    case 'leading-tone-resolution':
+    case 'role':
+      return reason.numeral;
+    case 'motion':
       return reason.side === 'after'
-        ? 'Leading tone to next'
-        : 'Leading-tone resolution';
-    case 'ii-v':
-      return 'ii–V motion';
-    case 'plagal':
-      return 'Plagal motion';
-    case 'fifths':
-      return 'Fifth movement';
-    case 'key-fit':
-      return 'Fits key';
-    case 'borrowed':
-      return 'Borrowed color';
-    case 'deceptive':
-      return 'Deceptive resolution';
+        ? `${focusLabels[reason.move]} to next`
+        : focusLabels[reason.move];
+    case 'bass-line':
+      return 'Bass line';
     case 'fixed-bass':
       return 'Same bass';
     case 'smooth-voices':
       return 'Smooth voices';
-    case 'shared-tones':
-      return 'Shared tones';
     case 'starting-point':
       return 'Explore';
   }
@@ -105,6 +119,9 @@ export function Recommendations({
       ? 'next'
       : mode;
   const bassCandidate = activeMode === 'bass' ? candidate : undefined;
+  const [focus, setFocus] = useState<RecommendationFocus>();
+  // Moves need a neighbor; the first chord has none.
+  const activeFocus = progression.length ? focus : undefined;
   const result = useMemo(
     () =>
       recommendChords({
@@ -125,7 +142,13 @@ export function Recommendations({
                       ? selectedIndex + 1
                       : progression.length,
                 },
-        ...(tonalKey ? { key: tonalKey } : {}),
+        // Without any chord or key, design in the draft's assumed C major.
+        ...(tonalKey
+          ? { key: tonalKey }
+          : progression.length
+            ? {}
+            : { key: assumedKey }),
+        ...(activeFocus ? { focus: activeFocus } : {}),
       }),
     [
       progression,
@@ -134,6 +157,7 @@ export function Recommendations({
       activeMode,
       bassCandidate,
       tonalKey,
+      activeFocus,
     ],
   );
   const [preview, setPreview] = useState<{
@@ -229,6 +253,28 @@ export function Recommendations({
           </button>
         ))}
       </fieldset>
+      <fieldset class={styles['focus']} aria-label="Suggestion move">
+        <button
+          type="button"
+          aria-label="Any move"
+          aria-pressed={!activeFocus}
+          onClick={() => setFocus(undefined)}
+        >
+          Any
+        </button>
+        {focusChoices.map((value) => (
+          <button
+            type="button"
+            key={value}
+            aria-label={focusNames[value]}
+            aria-pressed={activeFocus === value}
+            disabled={!progression.length}
+            onClick={() => setFocus(value)}
+          >
+            <MusicalText text={focusLabels[value]} />
+          </button>
+        ))}
+      </fieldset>
       <ul class={styles['list']}>
         {result.recommendations.map((item, index) => {
           const symbol = chordSymbol(item.chord);
@@ -241,18 +287,21 @@ export function Recommendations({
                     (85 * (item.score - lowestScore)) /
                       (highestScore - lowestScore),
                 );
-          const primary =
-            activeMode === 'bass'
-              ? 'Same bass'
-              : (reasons.find(
-                  (reason) =>
-                    ![
-                      'Fits key',
-                      'Shared tones',
-                      'Smooth voices',
-                      'Explore',
-                    ].includes(reason),
-                ) ?? reasons[0]!);
+          // Numeral first, then the strongest move; details stay in the tooltip.
+          const numeral = item.reasons.find((reason) => reason.kind === 'role');
+          const move = item.reasons.find(
+            (reason) =>
+              reason.kind === 'bass-line' ||
+              (reason.kind === 'motion' && reason.side === 'before'),
+          );
+          const primary = [
+            ...(numeral ? [reasonLabel(numeral)] : []),
+            ...(activeMode === 'bass'
+              ? ['Same bass']
+              : move
+                ? [reasonLabel(move)]
+                : []),
+          ];
           return (
             <li key={index}>
               <div className={styles['suggestion']}>
@@ -275,7 +324,9 @@ export function Recommendations({
                     </span>{' '}
                     <MusicalText text={symbol} />
                   </strong>
-                  <small>{primary}</small>
+                  <small>
+                    <MusicalText text={primary.join(' · ') || reasons[0]!} />
+                  </small>
                 </button>
                 <meter
                   class={styles['score']}
@@ -298,7 +349,13 @@ export function Recommendations({
           );
         })}
       </ul>
-      {!result.recommendations.length && <p>No playable matches</p>}
+      {!result.recommendations.length && (
+        <p>
+          {activeFocus
+            ? 'No chord makes this move here'
+            : 'No playable matches'}
+        </p>
+      )}
     </section>
   );
 }
