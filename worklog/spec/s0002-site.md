@@ -20,7 +20,7 @@ Site-wide requirements; product direction is in s0001.
 
 - Keep modules small, responsibilities explicit, and dependencies one-way.
 - Use package exports, declared dependencies, and code review. No dedicated architecture-analysis framework.
-- Introduce shared packages with real callers. Defer a global store, plugin system, persistence, workers, and DAW infrastructure until needed.
+- Introduce shared packages with real callers. Defer a global store, plugin system, workers, and DAW infrastructure until needed.
 - Keep specs concise: principles first, requirements next, open decisions last.
 - When runtime schemas are needed for untrusted or external values, prefer ArkType. Do not add schemas solely to mirror trusted TypeScript values.
 
@@ -43,6 +43,19 @@ Site-wide requirements; product direction is in s0001.
 - Use static HTML entry pages for separate utilities, with a centralized hosting base path.
 - Utilities may rotate their own viewport clockwise through 0°, 90°, 180°, and 270° without requiring device rotation. Keep the view container and its input-coordinate orientation reusable across utilities.
 - Publish GitHub Pages artifacts through Actions after checks pass on `main`, with a manual trigger. Default to `/rechorder/`; permit an explicit build base for other hosting paths.
+
+## Local persistence — t0028
+
+### Principles
+
+- A utility's durable state lives in one stored document per page under a single browser storage key, so a whole page can later be exported, imported or shared as one object.
+- The document is a versioned record of independent sections, each owned by the feature that stores it and validated on load with ArkType. A corrupt or outdated section falls back to its default alone; unknown sections are carried through saves so a newer build's data survives an older build.
+- Store editable data and settings; never store transient UI or playback state (candidate, selection, transport). Musical values cross the boundary as plain recipes — positions, catalogue IDs and explicit modifiers — rebuilt through the musical operations, so stored data follows catalogue corrections and other systems can add their own shapes.
+- Save after every change of a stored value; load once at page start. Unavailable or throwing storage degrades to in-memory behavior with a console warning, never a broken page.
+
+### Chord progression — t0028
+
+- Sections: progression entries with their stable IDs, the BPM setting and the explicit Key/Mode setting (Auto stored as none). Reopening the page restores them with nothing selected and no audio started.
 
 ## Verification
 

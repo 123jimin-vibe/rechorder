@@ -29,7 +29,10 @@ export {
   defaultChordOctave,
   bassPitch,
   rootLabel,
+  spelledPitch,
 } from './western';
+export { chordData, chordFromData } from './chord-data';
+export type { WesternChordData } from './chord-data';
 export {
   chordTones,
   bassRole,

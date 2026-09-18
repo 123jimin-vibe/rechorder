@@ -26,7 +26,8 @@ export type EditorAction =
   | { readonly type: 'select'; readonly id: string }
   | { readonly type: 'replace'; readonly value: WesternChord }
   | { readonly type: 'transpose'; readonly interval: WesternInterval }
-  | { readonly type: 'remove-last' };
+  | { readonly type: 'remove-last' }
+  | { readonly type: 'clear' };
 
 export const initialEditor: EditorState = { entries: [], selectedId: null };
 
@@ -78,5 +79,7 @@ export function editorReducer(
         selectedId: state.selectedId === last.id ? null : state.selectedId,
       };
     }
+    case 'clear':
+      return state.entries.length === 0 ? state : initialEditor;
   }
 }

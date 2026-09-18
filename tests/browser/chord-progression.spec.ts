@@ -239,6 +239,81 @@ test('append, load, replace, and backspace preserve musical values and identitie
   await expect(backspace).toBeDisabled();
 });
 
+test('progression, tempo and key survive a reload; copy and remove all act on the whole progression', async ({
+  page,
+  context,
+}) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await page.goto('./chord-progression/');
+  const cards = page.locator('[data-entry-id]');
+  const append = page.getByRole('button', { name: 'Append', exact: true });
+  const copy = page.getByRole('button', {
+    name: 'Copy progression',
+    exact: true,
+  });
+  const removeAll = page.getByRole('button', {
+    name: 'Remove all chords',
+    exact: true,
+  });
+  await expect(copy).toBeDisabled();
+  await expect(removeAll).toBeDisabled();
+
+  await append.click();
+  await page.getByRole('button', { name: 'Root A', exact: true }).click();
+  await page.getByRole('button', { name: 'Minor', exact: true }).click();
+  await append.click();
+  await page.getByRole('button', { name: 'Root F', exact: true }).click();
+  await page.getByRole('button', { name: 'Major', exact: true }).click();
+  await page.getByRole('button', { name: 'Bass A (3)', exact: true }).click();
+  await append.click();
+  await expect(cards.locator('strong')).toHaveText(['C', 'Am', 'F/A']);
+  const ids = await cards.evaluateAll((elements) =>
+    elements.map((element) => element.getAttribute('data-entry-id')),
+  );
+  const bpm = page.getByRole('spinbutton', { name: 'BPM', exact: true });
+  await bpm.fill('96');
+  await bpm.press('Enter');
+  await page.locator('#tonic').selectOption('G');
+  await page.locator('#tonal-mode').selectOption('minor');
+
+  await page.reload();
+  await expect(cards.locator('strong')).toHaveText(['C', 'Am', 'F/A']);
+  expect(
+    await cards.evaluateAll((elements) =>
+      elements.map((element) => element.getAttribute('data-entry-id')),
+    ),
+  ).toEqual(ids);
+  await expect(bpm).toHaveValue('96');
+  await expect(page.locator('#tonic')).toHaveValue('G');
+  await expect(page.locator('#tonal-mode')).toHaveValue('minor');
+  await expect(
+    page.getByRole('button', { name: 'Replace', exact: true }),
+  ).toBeDisabled();
+  await expect(page.getByLabel('Candidate chord')).toHaveText('CC4 · E4 · G4');
+
+  await copy.click();
+  await expect(
+    page.getByRole('button', { name: 'Copied', exact: true }),
+  ).toBeVisible();
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(
+    'C Am F/A',
+  );
+
+  await removeAll.click();
+  await expect(cards).toHaveCount(3);
+  const confirm = page.getByRole('button', {
+    name: 'Confirm remove all chords',
+    exact: true,
+  });
+  await confirm.click();
+  await expect(cards).toHaveCount(0);
+  await expect(removeAll).toBeDisabled();
+  await expect(copy).toBeDisabled();
+  await page.reload();
+  await expect(cards).toHaveCount(0);
+  await expect(bpm).toHaveValue('96');
+});
+
 test('root rows remain aligned and chord changes do not move the controls', async ({
   page,
 }) => {
@@ -548,7 +623,7 @@ test('compact long progressions scroll and controls remain keyboard operable', a
       name: /Move left|Move right|insertion|Insert chord/,
     }),
   ).toHaveCount(0);
-  await expect(page.getByRole('button', { name: /Remove/ })).toHaveCount(1);
+  await expect(page.getByRole('button', { name: /Remove/ })).toHaveCount(2);
   await page.screenshot({
     path: testInfo.outputPath('quick-transcription.png'),
     fullPage: true,
@@ -755,6 +830,8 @@ test('compact mobile workspace keeps primary controls comfortably touchable', as
   const touchTargets = [
     page.getByRole('button', { name: 'Decrease tempo', exact: true }),
     page.getByRole('button', { name: 'Play', exact: true }),
+    page.getByRole('button', { name: 'Copy progression', exact: true }),
+    page.getByRole('button', { name: 'Remove all chords', exact: true }),
     page.getByRole('button', { name: 'Play candidate', exact: true }),
     page.getByRole('button', { name: 'Append', exact: true }),
     page.getByRole('button', { name: 'Root C', exact: true }),

@@ -8,16 +8,18 @@
 
 ## Ownership
 
-| Module                                       | Responsibility                                                                      |
-| -------------------------------------------- | ----------------------------------------------------------------------------------- |
-| `@rechorder/music`                           | Plain musical data, voicing/tuning resolution, immutable insert/replace/remove/move |
-| `@rechorder/audio`                           | Audio-clock scheduling, cancellation, sounding-note snapshots, voice cleanup        |
-| `apps/web/src/chord-progression/editor.ts`   | Pure editor reducer; append, replace selected, remove last, stable selection        |
-| `apps/web/src/audio/audition.ts`             | Audition policy, progression transport, release tails, console error reporting      |
-| `apps/web/src/components/piano-keyboard.tsx` | Shared playable conventional keyboard; each instance owns its scroll viewport       |
-| `apps/web/src/components/rotatable-view.tsx` | Reusable 90-degree utility viewport and toggle                                      |
-| `apps/web/src/chord-progression/main.tsx`    | Service composition, page visibility and disposal                                   |
-| `apps/web/src/chord-progression/page.tsx`    | Candidate controls, rendering, and user actions                                     |
+| Module                                        | Responsibility                                                                             |
+| --------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `@rechorder/music`                            | Plain musical data, voicing/tuning resolution, immutable insert/replace/remove/move        |
+| `@rechorder/audio`                            | Audio-clock scheduling, cancellation, sounding-note snapshots, voice cleanup               |
+| `apps/web/src/chord-progression/editor.ts`    | Pure editor reducer; append, replace selected, remove last, clear, stable selection        |
+| `apps/web/src/audio/audition.ts`              | Audition policy, progression transport, release tails, console error reporting             |
+| `apps/web/src/components/piano-keyboard.tsx`  | Shared playable conventional keyboard; each instance owns its scroll viewport              |
+| `apps/web/src/components/rotatable-view.tsx`  | Reusable 90-degree utility viewport and toggle                                             |
+| `apps/web/src/chord-progression/main.tsx`     | Service composition, page visibility and disposal                                          |
+| `apps/web/src/chord-progression/page.tsx`     | Candidate controls, rendering, and user actions                                            |
+| `apps/web/src/persistence/stored-document.ts` | Generic stored page document: independently validated sections, foreign-section carry-over |
+| `apps/web/src/chord-progression/document.ts`  | This page's sections (progression entries, tempo, key) and their ArkType schemas           |
 
 Import reusable packages through their declared exports. Music has no Preact, DOM,
 or audio dependency. Audio consumes resolved notes and has no chord-theory or UI dependency.
@@ -60,8 +62,33 @@ Backspace always removes the last entry;
 removing the selected entry clears selection, keeping the candidate for reuse.
 
 Inputs come from the catalogue and explicit musical transforms. Membership and numeric boundary checks
-are sufficient; no runtime schema library is needed. Prefer ArkType when future
-imports, persistence, or other external structured data need schemas.
+are sufficient inside the app; stored or imported data is validated with ArkType at the boundary.
+
+## Persistence
+
+A page's durable state is one JSON document under a single `localStorage` key
+(`rechorder.chord-progression`): `{ version, progression, tempo, key, … }`. Each top-level
+field is a _section_ owned by the feature that needs it, with its own `encode`/`decode` pair
+(`DocumentSection`). `decode` returns `undefined` for absent or unusable data so only that
+section falls back to its default; sections a build does not know are carried through the
+next save so a newer build's data survives an older one. `version` is reserved for a wholesale
+format change; ordinary evolution adds optional fields or new sections. The page saves after
+every change of a stored value and loads once at mount. Candidate, selection and playback are
+deliberately not stored (s0002 separates editable data, UI state and transient playback).
+Storage that throws or is missing degrades to in-memory behavior with a console warning.
+
+Chords cross this boundary as `WesternChordData` (`@rechorder/music`): the root and bass
+_positions_, the catalogue definition _ID_ and the explicit alteration/addition/omission
+recipe, plus voicing. `chordFromData` rebuilds the derived definition through `alterChord`
+and `setBass`, so stored chords follow catalogue corrections and cannot carry stale
+intervals. The app rejects a progression section whose chords are unknown, duplicate-ID or
+outside the editor's audition bounds. `@rechorder/music` itself has no schema dependency;
+ArkType lives in the app, where DOM typings exist (its declarations reference `File`; a
+one-line `buffer` module shim in `apps/web/src/node-buffer.d.ts` satisfies library checking).
+
+To add a stored value: define a `DocumentSection`, add it to `progressionDocument`, read it
+from `saved` in `page.tsx`, and include it in the `store.save` effect. To persist another
+utility, open a second document under its own key.
 
 ## Audio lifecycle
 

@@ -3,28 +3,29 @@ import { rootLabel, roots, tonalModes } from '@rechorder/music';
 import type { TonalKey, TonalMode } from '@rechorder/music';
 import { modeLabels } from './tonal-context';
 import { tempoLimits } from '../audio/audition';
-import type { AuditionController } from '../audio/audition';
 import styles from './editor.module.css';
 
 /** One beat per press keeps the pads useful for both fine and repeated changes. */
 const tempoStep = 1;
 
 export function ProgressionSettings({
-  controller,
+  tempo,
+  onTempoChange,
   tonalKey,
   onKeyChange,
 }: {
-  readonly controller: AuditionController;
+  readonly tempo: number;
+  readonly onTempoChange: (bpm: number) => void;
   readonly tonalKey: TonalKey | undefined;
   readonly onKeyChange: (key: TonalKey | undefined) => void;
 }) {
-  const [value, setValue] = useState(String(controller.tempo()));
+  const [value, setValue] = useState(String(tempo));
   const typed = Number.parseFloat(value);
   // Step from what the user is looking at; fall back to the applied tempo while
   // the field is empty or unparseable.
-  const current = Number.isFinite(typed) ? typed : controller.tempo();
+  const current = Number.isFinite(typed) ? typed : tempo;
   const apply = (input: HTMLInputElement) => {
-    if (input.reportValidity()) controller.setTempo(input.valueAsNumber);
+    if (input.reportValidity()) onTempoChange(input.valueAsNumber);
   };
   const step = (delta: number) => {
     const next = Math.min(
@@ -32,7 +33,7 @@ export function ProgressionSettings({
       Math.max(tempoLimits.min, current + delta),
     );
     setValue(String(next));
-    controller.setTempo(next);
+    onTempoChange(next);
   };
   return (
     <form

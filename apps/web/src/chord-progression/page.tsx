@@ -1,4 +1,5 @@
 import {
+  useEffect,
   useLayoutEffect,
   useMemo,
   useReducer,
@@ -20,9 +21,15 @@ import {
   voiceChord,
 } from '@rechorder/music';
 import type { TonalKey, WesternChord } from '@rechorder/music';
+import { progressionBpm } from '../audio/audition';
 import type { AuditionController } from '../audio/audition';
 import { useProgressionPlayback } from '../audio/use-progression-playback';
 import { useSoundingNotes } from '../audio/use-sounding-notes';
+import {
+  availableStorage,
+  openStoredDocument,
+} from '../persistence/stored-document';
+import { progressionDocument, progressionDocumentKey } from './document';
 import { editorReducer, initialEditor } from './editor';
 import { BassOptions, JazzOptions, rootPads } from './chord-options';
 import {
@@ -43,10 +50,26 @@ export function EditorPage({
 }: {
   readonly controller: AuditionController;
 }) {
-  const [state, dispatch] = useReducer(editorReducer, initialEditor);
+  const [{ store, saved }] = useState(() => {
+    const store = openStoredDocument(
+      availableStorage(() => globalThis.localStorage),
+      progressionDocumentKey,
+      progressionDocument,
+    );
+    return { store, saved: store.load() };
+  });
+  const [state, dispatch] = useReducer(
+    editorReducer,
+    saved.progression
+      ? { entries: saved.progression, selectedId: null }
+      : initialEditor,
+  );
   const [candidate, setCandidate] = useState(() => createChord('C', 'major'));
-  const [tonalKey, setTonalKey] = useState<TonalKey>();
+  const [tonalKey, setTonalKey] = useState<TonalKey | undefined>(saved.key);
+  const [tempo, setTempo] = useState(saved.tempo ?? progressionBpm);
   const [suggestionMode, setSuggestionMode] = useState<SuggestionMode>('next');
+  const [copied, setCopied] = useState(false);
+  const [clearArmed, setClearArmed] = useState(false);
   const progression = useMemo(
     () => state.entries.map((entry) => entry.value),
     [state.entries],
@@ -91,6 +114,26 @@ export function EditorPage({
     previousLength.current = state.entries.length;
   }, [state.entries.length]);
 
+  useEffect(() => {
+    controller.setTempo(tempo);
+  }, [controller, tempo]);
+
+  useEffect(() => {
+    store.save({ progression: state.entries, tempo, key: tonalKey });
+  }, [store, state.entries, tempo, tonalKey]);
+
+  // Transient button feedback: both states clear themselves.
+  useEffect(() => {
+    if (!copied) return;
+    const timer = setTimeout(() => setCopied(false), 1500);
+    return () => clearTimeout(timer);
+  }, [copied]);
+  useEffect(() => {
+    if (!clearArmed) return;
+    const timer = setTimeout(() => setClearArmed(false), 4000);
+    return () => clearTimeout(timer);
+  }, [clearArmed]);
+
   function play(chord: WesternChord, source: string) {
     try {
       void controller.play(
@@ -113,6 +156,24 @@ export function EditorPage({
       source: entry.id,
       notes: resolvePitches(voiceChord(entry.value), standardTuning),
     }));
+  }
+
+  function copyProgression() {
+    const text = state.entries
+      .map((entry) => chordSymbol(entry.value))
+      .join(' ');
+    navigator.clipboard.writeText(text).then(
+      () => setCopied(true),
+      (error: unknown) =>
+        console.error('Copying the progression failed.', error),
+    );
+  }
+
+  function clearProgression() {
+    controller.stopProgression();
+    for (const entry of state.entries) controller.stopSource(entry.id);
+    dispatch({ type: 'clear' });
+    setClearArmed(false);
   }
 
   function useSuggestion(chord: WesternChord, mode: SuggestionMode) {
@@ -147,7 +208,8 @@ export function EditorPage({
         <h1>Chord progression</h1>
       </header>
       <ProgressionSettings
-        controller={controller}
+        tempo={tempo}
+        onTempoChange={setTempo}
         tonalKey={tonalKey}
         onKeyChange={setTonalKey}
       />
@@ -221,35 +283,77 @@ export function EditorPage({
                 </svg>
               </button>
             </fieldset>
-            <button
-              type="button"
-              class={styles['backspace']}
-              aria-label="Remove last chord"
-              title="Remove last chord"
-              disabled={state.entries.length === 0}
-              onClick={() => {
-                const last = state.entries.at(-1);
-                if (last) {
-                  controller.stopSource(last.id);
-                  dispatch({ type: 'remove-last' });
-                }
-              }}
-            >
-              <svg
-                aria-hidden="true"
-                viewBox="0 0 24 24"
-                width="18"
-                height="18"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="1.7"
-                stroke-linecap="round"
-                stroke-linejoin="round"
+            <fieldset class={styles['editing']} aria-label="Editing">
+              <button
+                type="button"
+                aria-label={copied ? 'Copied' : 'Copy progression'}
+                title="Copy progression"
+                disabled={state.entries.length === 0}
+                data-done={copied}
+                onClick={copyProgression}
               >
-                <path d="M9 5h12v14H9l-7-7Z" />
-                <path d="m12 9 6 6m0-6-6 6" />
-              </svg>
-            </button>
+                {copied ? (
+                  <svg aria-hidden="true" viewBox="0 0 24 24">
+                    <path d="m5 12.5 4.5 4.5L19 7" />
+                  </svg>
+                ) : (
+                  <svg aria-hidden="true" viewBox="0 0 24 24">
+                    <rect x="9" y="8" width="11" height="12" rx="1.5" />
+                    <path d="M15 8V5.5A1.5 1.5 0 0 0 13.5 4h-8A1.5 1.5 0 0 0 4 5.5v9A1.5 1.5 0 0 0 5.5 16H9" />
+                  </svg>
+                )}
+              </button>
+              <button
+                type="button"
+                class={styles['danger']}
+                aria-label="Remove last chord"
+                title="Remove last chord"
+                disabled={state.entries.length === 0}
+                onClick={() => {
+                  const last = state.entries.at(-1);
+                  if (last) {
+                    controller.stopSource(last.id);
+                    dispatch({ type: 'remove-last' });
+                  }
+                }}
+              >
+                <svg aria-hidden="true" viewBox="0 0 24 24">
+                  <path d="M9 5h12v14H9l-7-7Z" />
+                  <path d="m12 9 6 6m0-6-6 6" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                class={styles['danger']}
+                aria-label={
+                  clearArmed ? 'Confirm remove all chords' : 'Remove all chords'
+                }
+                title={
+                  clearArmed
+                    ? 'Tap again to remove all chords'
+                    : 'Remove all chords'
+                }
+                disabled={state.entries.length === 0}
+                data-armed={clearArmed}
+                onClick={() =>
+                  clearArmed ? clearProgression() : setClearArmed(true)
+                }
+                onBlur={() => setClearArmed(false)}
+              >
+                {clearArmed ? (
+                  <svg aria-hidden="true" viewBox="0 0 24 24">
+                    <path d="m5 12.5 4.5 4.5L19 7" />
+                  </svg>
+                ) : (
+                  <svg aria-hidden="true" viewBox="0 0 24 24">
+                    <path d="M4 7h16" />
+                    <path d="M9 7V4.5h6V7" />
+                    <path d="M6 7l1 13h10l1-13" />
+                    <path d="M10 11v6m4-6v6" />
+                  </svg>
+                )}
+              </button>
+            </fieldset>
           </div>
         </div>
         <div class={styles['timelineRow']}>

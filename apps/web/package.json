@@ -9,8 +9,9 @@
     "preview": "vite preview --host 127.0.0.1"
   },
   "dependencies": {
-    "@rechorder/music": "workspace:*",
     "@rechorder/audio": "workspace:*",
+    "@rechorder/music": "workspace:*",
+    "arktype": "2.2.3",
     "preact": "10.29.8"
   },
   "devDependencies": {

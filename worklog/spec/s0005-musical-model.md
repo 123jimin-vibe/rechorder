@@ -29,7 +29,12 @@ title = "Musical Model"
 
 ## Deferred
 
-Tuning controls, text parsing, persistence, undo, and a comprehensive theory library.
+Tuning controls, text parsing, undo, and a comprehensive theory library.
+
+## Stored chord data — t0028
+
+- The conventional adapter exposes a plain, JSON-ready chord shape for storage and transfer: root and bass positions (spelling derived on load), the catalogue definition ID, the explicit alteration/addition/omission recipe, and the voicing. The derived definition is never stored; loading rebuilds it through the same alteration and bass operations the editor uses and throws on unknown types, conflicting alterations, out-of-range degrees or an absent bass degree.
+- Runtime validation of untrusted data happens in the application at the storage boundary (s0002); the music package stays free of schema and platform dependencies.
 
 ## Contextual recommendations — t0025, t0027
 
