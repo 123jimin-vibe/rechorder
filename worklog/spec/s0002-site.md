@@ -71,3 +71,7 @@ The static `/chord-progression/` page implements s0003–s0005, linked from a pl
 ## Piano utility — t0010
 
 The static `/piano/` page implements s0006 and follows the chord progression link on the home-page feature list.
+
+## Harmonic grid utility — t0030
+
+The static `/harmonic-grid/` page implements s0007 and follows Piano on the home-page feature list.

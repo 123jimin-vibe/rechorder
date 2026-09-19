@@ -31,6 +31,13 @@ title = "Musical Model"
 
 Tuning controls, text parsing, undo, and a comprehensive theory library.
 
+## Pythagorean pitches — t0030
+
+- Represent a pitch by integer pure-fifth and octave displacements from C4. Preserve these coordinates independently of frequency and conventional enharmonic equivalence.
+- Derive its diatonic spelling from the fifth chain, including accidentals and register. Resolve tuning with the 3:2 fifth and 2:1 octave, anchored to A4 = 440 Hz.
+- Expose this as a separate adapter; conventional chord-editor tuning remains governed by its own requirements.
+- Expose the Pythagorean letter, accidental text, and spelled octave separately for presentation. Use double-accidental glyphs instead of repeated single signs; combine singles and doubles through quadruple accidentals and use bounded multiplier notation for longer chains.
+
 ## Stored chord data — t0028
 
 - The conventional adapter exposes a plain, JSON-ready chord shape for storage and transfer: root and bass positions (spelling derived on load), the catalogue definition ID, the explicit alteration/addition/omission recipe, and the voicing. The derived definition is never stored; loading rebuilds it through the same alteration and bass operations the editor uses and throws on unknown types, conflicting alterations, out-of-range degrees or an absent bass degree.

@@ -1,0 +1,139 @@
+@font-face {
+  font-family: 'Rechorder Accidentals';
+  src: url('./fonts/rechorder-accidentals.woff2') format('woff2');
+  font-weight: 400;
+  font-display: swap;
+  unicode-range: U+266D, U+266F;
+}
+
+.page {
+  position: fixed;
+  inset: 0;
+  min-block-size: 0;
+  overflow: hidden;
+  background: var(--border);
+}
+
+.surface {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+  cursor: grab;
+  outline: none;
+
+  &:active {
+    cursor: grabbing;
+  }
+
+  &:focus-visible .cell[data-focused='true'] polygon {
+    stroke: var(--focus);
+    stroke-width: 3;
+  }
+}
+
+.grid {
+  display: block;
+  pointer-events: none;
+}
+
+.cell {
+  polygon {
+    fill: hsl(var(--octave-hue) 62% 86%);
+    stroke: var(--surface);
+    stroke-width: 1;
+  }
+
+  text {
+    fill: var(--text);
+    font-size: 26px;
+    font-weight: 600;
+  }
+
+  &[data-playable='false'] {
+    opacity: 0.4;
+    polygon {
+      fill: hsl(var(--octave-hue) 20% 90%);
+    }
+    text {
+      fill: var(--muted);
+    }
+  }
+
+  &[data-held='true'] {
+    polygon {
+      fill: hsl(var(--octave-hue) 55% 26%);
+      stroke: hsl(var(--octave-hue) 60% 20%);
+      stroke-width: 2;
+    }
+    text {
+      fill: var(--on-accent);
+    }
+  }
+}
+
+.accidental {
+  font-family: 'Rechorder Accidentals', 'Segoe UI Symbol', serif;
+  font-size: 21px;
+  font-weight: 400;
+}
+
+.comma {
+  font-size: 19px;
+  font-weight: 500;
+  baseline-shift: 3px;
+}
+
+.commaCount {
+  font-size: 11px;
+  font-weight: 500;
+  baseline-shift: 8px;
+}
+
+.octave {
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.back {
+  position: absolute;
+  inset-block-start: max(8px, env(safe-area-inset-top));
+  inset-inline-start: max(8px, env(safe-area-inset-left));
+  display: grid;
+  place-items: center;
+  inline-size: 44px;
+  block-size: 44px;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--muted);
+
+  svg {
+    inline-size: 24px;
+    block-size: 24px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.7;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  &:hover {
+    color: var(--accent);
+  }
+}
+
+.srOnly {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

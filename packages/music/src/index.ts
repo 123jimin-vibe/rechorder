@@ -6,6 +6,8 @@ export type {
   ResolvedNote,
 } from './model';
 export { resolvePitches } from './model';
+export { pythagoreanPitch, pythagoreanTuning } from './pythagorean';
+export type { PythagoreanPitch, PythagoreanPosition } from './pythagorean';
 export type {
   WesternChord,
   WesternPosition,

@@ -13,6 +13,11 @@ export function App() {
         <li>
           <a href={`${import.meta.env.BASE_URL}piano/`}>Piano</a>
         </li>
+        <li>
+          <a href={`${import.meta.env.BASE_URL}harmonic-grid/`}>
+            Harmonic grid
+          </a>
+        </li>
       </ul>
     </main>
   );

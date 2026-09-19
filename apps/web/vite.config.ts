@@ -13,6 +13,9 @@ export default defineConfig({
           new URL('./chord-progression/index.html', import.meta.url),
         ),
         piano: fileURLToPath(new URL('./piano/index.html', import.meta.url)),
+        harmonicGrid: fileURLToPath(
+          new URL('./harmonic-grid/index.html', import.meta.url),
+        ),
       },
     },
   },
