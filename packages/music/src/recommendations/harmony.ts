@@ -14,6 +14,13 @@ export const hasInterval = (chord: WesternChord, interval: number) =>
   );
 export const hasThird = (chord: WesternChord) =>
   hasInterval(chord, 3) || hasInterval(chord, 4);
+/** Ninths and beyond, plus added sixths: colour that context must justify. */
+export const isExtended = (chord: WesternChord) =>
+  chord.definition.intervals.some(
+    (value) =>
+      value.chromaticSteps > 12 ||
+      (value.diatonicSteps === 5 && value.chromaticSteps === 9),
+  );
 
 /** Root moves shared by the ranker and the design controls. */
 export type Move =

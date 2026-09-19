@@ -374,6 +374,127 @@ describe('contextual recommendations', () => {
       else interpretationsBySound.set(sound, new Set([interpretation]));
     }
   });
+  it('treats stepwise root motion as roots, not as a bass line to continue', () => {
+    const key_ = key('C');
+    const next = recommendChords({
+      progression: [c('C', 'major'), c('G', 'major'), c('A', 'minor')],
+      target: { kind: 'insert', index: 3 },
+      key: key_,
+    });
+    for (const item of next.recommendations)
+      expect(voiceChord(item.chord)[0]!.position.letter).toBe(
+        item.chord.root.position.letter,
+      );
+    expect(names(next.recommendations)[0]).toBe('C');
+    const cadence = recommendChords({
+      progression: [c('F', 'major'), c('G', 'major')],
+      target: { kind: 'insert', index: 2 },
+      key: key_,
+    });
+    expect(names(cadence.recommendations)[0]).toBe('C');
+    const replaced = recommendChords({
+      progression: [
+        c('C', 'major'),
+        c('G', 'major'),
+        c('A', 'minor'),
+        c('E', 'minor'),
+      ],
+      target: { kind: 'replace', index: 3 },
+      key: key_,
+    });
+    expect(names(replaced.recommendations)).toContain('C');
+    expect(names(replaced.recommendations)).not.toContain('Cmaj7/B');
+  });
+  it('lists in score order with the diversity penalty accounted in the score', () => {
+    const result = recommendChords({
+      progression: [
+        c('C', 'major'),
+        c('G', 'major'),
+        c('A', 'minor'),
+        c('E', 'minor'),
+      ],
+      target: { kind: 'replace', index: 3 },
+      key: key('C'),
+      limit: 8,
+    });
+    const scores = result.recommendations.map((item) => item.score);
+    expect(scores).toEqual([...scores].sort((a, b) => b - a));
+    for (const item of result.recommendations) {
+      const sum = Object.values(item.components).reduce((a, b) => a + b, 0);
+      expect(item.score).toBeCloseTo(sum, 6);
+    }
+    expect(result.recommendations[0]!.components.variety).toBe(0);
+    expect(
+      result.recommendations
+        .slice(1)
+        .some((item) => item.components.variety < 0),
+    ).toBe(true);
+  });
+  it('keeps the plain tonic triad available after a dominant seventh', () => {
+    const major = recommendChords({
+      progression: [c('G', 'dominant7')],
+      target: { kind: 'insert', index: 1 },
+    });
+    expect(names(major.recommendations)).toContain('C');
+    const minor = recommendChords({
+      progression: [c('E', 'dominant7')],
+      target: { kind: 'insert', index: 1 },
+      key: key('A', 'minor'),
+    });
+    expect(names(minor.recommendations)).toContain('Am');
+  });
+  it('does not penalize returning to the tonic after two chords', () => {
+    const loop = recommendChords({
+      progression: [
+        c('A', 'minor'),
+        c('F', 'major'),
+        c('C', 'major'),
+        c('G', 'major'),
+      ],
+      target: { kind: 'insert', index: 4 },
+    });
+    expect(names(loop.recommendations)[0]).toBe('C');
+    const plagal = recommendChords({
+      progression: [c('C', 'major'), c('F', 'major')],
+      target: { kind: 'insert', index: 2 },
+      key: key('C'),
+    });
+    expect(names(plagal.recommendations)).toContain('C');
+    const oscillation = recommendChords({
+      progression: [c('C', 'major'), c('D', 'minor'), c('G', 'major')],
+      target: { kind: 'insert', index: 3 },
+      key: key('C'),
+      limit: 24,
+    });
+    expect(
+      oscillation.recommendations.find(
+        (item) => item.chord.root.spelling === 'D4',
+      )!.components.complexity,
+    ).toBeLessThan(0);
+  });
+  it('ranks a focused list by score and prefers the diatonic quality', () => {
+    const result = recommendChords({
+      progression: [c('C', 'major'), c('G', 'major'), c('A', 'minor')],
+      target: { kind: 'insert', index: 3 },
+      key: key('C'),
+      focus: 'fifth-up',
+    });
+    expect(names(result.recommendations)[0]).toBe('Em');
+    expect(
+      result.recommendations.every((item) => item.components.variety === 0),
+    ).toBe(true);
+  });
+  it('spells leading-tone chords on the raised degree', () => {
+    const result = recommendChords({
+      progression: [c('C', 'major')],
+      target: { kind: 'insert', index: 1 },
+      key: key('C'),
+      focus: 'color',
+      limit: 8,
+    });
+    expect(names(result.recommendations)).toContain('C♯dim');
+    expect(names(result.recommendations)).not.toContain('D♭dim');
+  });
 });
 
 describe('key-relative roles and chords', () => {
@@ -407,6 +528,17 @@ describe('key-relative roles and chords', () => {
     expect(chordRole(c('E', 'augmented'), minor).function).toBe('chromatic');
     expect(chordRole(c('C', 'major'), major).prior).toBeGreaterThan(
       chordRole(c('E', 'minor'), major).prior,
+    );
+    // Diatonic iii outranks the applied dominant on the same root; colour variants
+    // rank below the plain degree.
+    expect(chordRole(c('E', 'minor'), major).prior).toBeGreaterThan(
+      chordRole(c('E', 'major'), major).prior,
+    );
+    expect(chordRole(c('C', 'add9'), major).prior).toBeLessThan(
+      chordRole(c('C', 'major7'), major).prior,
+    );
+    expect(chordRole(c('C', 'sus4'), major).prior).toBeLessThan(
+      chordRole(c('C', 'add9'), major).prior,
     );
   });
   it('builds diatonic triads and sevenths with the minor leading tone', () => {

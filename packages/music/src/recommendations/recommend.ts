@@ -7,12 +7,18 @@ import {
 } from '../western';
 import { isAuditionable, voiceChord } from '../chord-manipulation';
 import type { HarmonicFunction, TonalContext, TonalKey } from './tonality';
-import { chordRole, inferTonality, recommendationRoots } from './tonality';
+import {
+  chordRole,
+  inferTonality,
+  leadingToneRoot,
+  recommendationRoots,
+} from './tonality';
 import type { Move } from './harmony';
 import {
   commonToneCount,
   hasInterval,
   hasThird,
+  isExtended,
   motion,
   pitchClass,
   pitchClasses,
@@ -64,6 +70,8 @@ export interface RecommendationScore {
   readonly voiceLeading: number;
   readonly similarity: number;
   readonly complexity: number;
+  /** Diversity penalty against the suggestions listed before this one. */
+  readonly variety: number;
 }
 export interface ChordRecommendation {
   readonly chord: WesternChord;
@@ -82,13 +90,6 @@ const harmonicIdentity = (chord: WesternChord) =>
   pitchClasses(chord)
     .sort((a, b) => a - b)
     .join(',');
-/** Ninths and beyond, plus added sixths, are colour that neighbors must justify. */
-const isExtended = (chord: WesternChord) =>
-  chord.definition.intervals.some(
-    (value) =>
-      value.chromaticSteps > 12 ||
-      (value.diatonicSteps === 5 && value.chromaticSteps === 9),
-  );
 
 function interpretationIdentity(item: ChordRecommendation): string {
   return item.reasons
@@ -167,6 +168,20 @@ function qualityPrior(chord: WesternChord): number {
   return hasInterval(chord, 4) ? 1 : 0.85;
 }
 
+/** Total weight of the hypotheses in which a key-relative claim holds. */
+function hypothesisWeight(
+  context: TonalContext,
+  holds: (key: TonalKey) => boolean,
+): number {
+  return context.hypotheses.reduce(
+    (sum, hypothesis) => sum + (holds(hypothesis.key) ? hypothesis.weight : 0),
+    0,
+  );
+}
+
+const isDominantRole = (chord: WesternChord, key: TonalKey) =>
+  ['dominant', 'applied'].includes(chordRole(chord, key).function);
+
 /** Pure, bounded conventional-tonal search. See docs/chord-recommendations.md for
  * score terms and limits. Scores are heuristic preferences, never probabilities.
  */
@@ -218,12 +233,16 @@ export function recommendChords(
     ...local,
     ...(original ? [original] : []),
   ]);
+  const beforeDominant = before
+    ? hypothesisWeight(context, (key) => isDominantRole(before, key))
+    : 0;
   const pool = roots
     .flatMap((root) =>
-      vocabulary.map((definition) => ({
-        ...createChord('C', definition.id),
-        root,
-      })),
+      vocabulary.map((definition) => {
+        const chord = { ...createChord('C', definition.id), root };
+        const respelled = primaryKey && leadingToneRoot(chord, primaryKey);
+        return respelled ? { ...chord, root: respelled } : chord;
+      }),
     )
     .filter((chord) => {
       if (original && harmonicIdentity(chord) === harmonicIdentity(original))
@@ -240,6 +259,10 @@ export function recommendChords(
         (sum, hypothesis) =>
           sum + chordRole(chord, hypothesis.key).prior * hypothesis.weight,
         0,
+      );
+      const tonicWeight = hypothesisWeight(
+        context,
+        (key) => pitchClass(chord.root) === pitchClass(key.tonic),
       );
       const role =
         3 *
@@ -264,7 +287,7 @@ export function recommendChords(
         });
       }
       let motionScore = 0;
-      let voiceLeading = 0;
+      let movement = 0;
       for (const side of ['before', 'after'] as const) {
         const adjacent = side === 'before' ? before : after;
         if (!adjacent) continue;
@@ -272,26 +295,30 @@ export function recommendChords(
           side === 'before' ? motion(adjacent, chord) : motion(chord, adjacent);
         const from = side === 'before' ? adjacent : chord;
         // A triad a fifth above is only a dominant when it carries a seventh or the
-        // key hears it as one; otherwise I–IV is fifth motion, not a resolution.
+        // likely keys hear it as one; otherwise I–IV is fifth motion, not a resolution.
+        const heardAsDominant =
+          hasInterval(from, 10) ||
+          (side === 'before'
+            ? beforeDominant
+            : hypothesisWeight(context, (key) => isDominantRole(chord, key))) >=
+            0.5;
         const step =
-          raw.move === 'dominant' &&
-          !hasInterval(from, 10) &&
-          !(
-            primaryKey &&
-            ['dominant', 'applied'].includes(
-              chordRole(from, primaryKey).function,
-            )
-          )
+          raw.move === 'dominant' && !heardAsDominant
             ? { move: 'fifth-down' as const, strength: 0.7 }
             : raw;
         motionScore += (side === 'before' ? 2 : 1) * step.strength;
         reasons.push({ kind: 'motion', move: step.move, side });
-        voiceLeading -= pitchClassMovement(adjacent, chord);
+        movement += pitchClassMovement(adjacent, chord);
       }
-      voiceLeading /= Number(!!before) + Number(!!after) || 1;
+      // Smoothness is coherence evidence (n0004 §5), weighted as a tie-breaker so a
+      // chromatic common-tone chord cannot outrank a diatonic step relation on it.
+      const voiceLeading =
+        (-0.5 * movement) / (Number(!!before) + Number(!!after) || 1);
       const similarity = original ? commonToneCount(chord, original) * 0.45 : 0;
-      // Match the local vocabulary's density; penalize repeating recent harmony.
+      // Match the local vocabulary's density; thinning is a lighter mismatch than
+      // thickening, since a triad is never foreign. Penalize repeating recent harmony.
       const density = neighbor?.definition.intervals.length ?? 3;
+      const size = chord.definition.intervals.length;
       const identity = harmonicIdentity(chord);
       const repeats = (value: WesternChord | undefined) =>
         !value
@@ -302,16 +329,17 @@ export function recommendChords(
               ? 1.5
               : 0;
       const complexity =
-        -0.55 * Math.abs(chord.definition.intervals.length - density) -
+        -0.7 * Math.max(0, size - density) -
+        0.3 * Math.max(0, density - size) -
         (isExtended(chord) && !(neighbor && isExtended(neighbor)) ? 0.4 : 0) -
         repeats(before) -
         repeats(after) -
+        // Returning to the root heard two chords earlier is idiomatic for the tonic
+        // (I–V–I, I–IV–I, loop restarts) and oscillation elsewhere (n0004 §3).
         (earlier && pitchClass(earlier.root) === pitchClass(chord.root)
-          ? 1.5
+          ? 0.75 * (1 - tonicWeight)
           : 0) -
-        (chord.definition.intervals.length > 5
-          ? 0.4 * (chord.definition.intervals.length - 5)
-          : 0);
+        (size > 5 ? 0.4 * (size - 5) : 0);
       if (fixedBass) reasons.unshift({ kind: 'fixed-bass' });
       if (!reasons.length) reasons.push({ kind: 'starting-point' });
       return {
@@ -324,6 +352,7 @@ export function recommendChords(
           voiceLeading,
           similarity,
           complexity,
+          variety: 0,
         },
         score: role + motionScore + voiceLeading + similarity + complexity,
       };
@@ -359,7 +388,7 @@ export function recommendChords(
       const reasons = [
         ...(chosen.bassLine >= 0.75 ? [{ kind: 'bass-line' } as const] : []),
         ...item.reasons,
-        ...(item.components.voiceLeading >= -0.7 && neighbor
+        ...(item.components.voiceLeading >= -0.35 && neighbor
           ? [{ kind: 'smooth-voices' } as const]
           : []),
       ];
@@ -384,38 +413,43 @@ export function recommendChords(
   const distinctVoicings = deduplicateEquivalentVoicings(voiced);
 
   // Greedy diversity reranking keeps useful alternatives across roots, basses and
-  // pitch sets. Stable catalogue order breaks exact ties; no randomness or mutation.
+  // pitch sets; the penalty is reported as `variety` so rank and score agree. A
+  // move focus fixes the root by construction, so only sound overlap counts there.
+  // Stable catalogue order breaks exact ties; no randomness or mutation.
+  const rootVariety = focus && focus !== 'color' ? 0 : 1;
   const recommendations: ChordRecommendation[] = [];
   while (recommendations.length < limit && distinctVoicings.length) {
-    let bestIndex = 0;
-    let bestScore = -Infinity;
-    for (const [candidateIndex, item] of distinctVoicings.entries()) {
+    let best = { index: 0, variety: 0, score: -Infinity };
+    for (const [index, item] of distinctVoicings.entries()) {
       const bass = pitchClass(voiceChord(item.chord)[0]!);
-      let repeatedRoots = 0;
-      let repeatedBasses = 0;
+      let repeated = 0;
       let overlap = 0;
       for (const value of recommendations) {
-        if (pitchClass(value.chord.root) === pitchClass(item.chord.root))
-          repeatedRoots++;
-        if (pitchClass(voiceChord(value.chord)[0]!) === bass) repeatedBasses++;
+        if (pitchClass(value.chord.root) === pitchClass(item.chord.root)) {
+          repeated += rootVariety;
+          continue;
+        }
+        if (pitchClass(voiceChord(value.chord)[0]!) === bass) repeated += 0.5;
         overlap = Math.max(
           overlap,
           commonToneCount(value.chord, item.chord) /
-            Math.max(
+            Math.min(
               pitchClasses(value.chord).length,
               pitchClasses(item.chord).length,
             ),
         );
       }
-      const score =
-        item.score - repeatedRoots * 1.5 - repeatedBasses * 0.75 - overlap;
-      if (score > bestScore) {
-        bestScore = score;
-        bestIndex = candidateIndex;
-      }
+      const variety = 0 - (repeated + 0.75 * overlap);
+      if (item.score + variety > best.score)
+        best = { index, variety, score: item.score + variety };
     }
-    const [chosen] = distinctVoicings.splice(bestIndex, 1);
-    if (chosen) recommendations.push(chosen);
+    const [chosen] = distinctVoicings.splice(best.index, 1);
+    if (chosen)
+      recommendations.push({
+        ...chosen,
+        score: best.score,
+        components: { ...chosen.components, variety: best.variety },
+      });
   }
   return { context, recommendations };
 }

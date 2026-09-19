@@ -66,6 +66,7 @@ Supporting varied musical data does not require exposing these controls now.
 
 - Offer explainable choices, not a single supposedly correct continuation. Key is optional context, never a hard whitelist; inferred context is uncertain.
 - Preserve deliberate commits, candidate isolation and stable entry identity. Keep the common path compact on portrait screens, with labelled controls instead of instructional prose.
+- Rank by function first: key role and root motion decide, voice-leading smoothness only breaks ties. Offer inversions only to continue a bass line the user started with an inverted chord; ordinary root motion keeps roots in the bass. Returning to the tonic is never penalized. The list is in score order and each bar agrees with its position (t0029).
 
 ### Settings and actions
 

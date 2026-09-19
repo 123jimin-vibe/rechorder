@@ -5,6 +5,7 @@ import { transposePitch, voiceChord } from '../chord-manipulation';
 import {
   hasInterval,
   hasThird,
+  isExtended,
   mod12,
   motion,
   pitchClass,
@@ -137,6 +138,16 @@ export function inferTonality(
   };
 }
 
+/** Chord roots live in the editor's default octave whatever pitch derived them. */
+export function atRootOctave(
+  pitch: Pitch<WesternPosition>,
+): Pitch<WesternPosition> {
+  return {
+    position: { ...pitch.position, octave: 4 },
+    spelling: rootLabel(pitch.position) + '4',
+  };
+}
+
 /** One spelling per pitch class, preferring explicit scale spelling and local roots. */
 export function recommendationRoots(
   context: TonalContext,
@@ -157,10 +168,27 @@ export function recommendationRoots(
       pitches[pitchClass(leadingTone)] = leadingTone;
     }
   }
-  return pitches.map((pitch) => ({
-    position: { ...pitch.position, octave: 4 },
-    spelling: rootLabel(pitch.position) + '4',
-  }));
+  return pitches.map(atRootOctave);
+}
+
+/** Leading-tone chords root on a raised degree: C♯dim7 into Dm, not D♭dim7. A
+ * diminished chord on a chromatic root is respelled as the sharpened scale step
+ * below; every other chromatic root keeps the key's flat-side spelling.
+ */
+export function leadingToneRoot(
+  chord: WesternChord,
+  key: TonalKey,
+): Pitch<WesternPosition> | undefined {
+  if (!hasInterval(chord, 3) || !hasInterval(chord, 6)) return undefined;
+  const scale = scalePitches(key);
+  const root = pitchClass(chord.root);
+  if (scale.some((pitch) => pitchClass(pitch) === root)) return undefined;
+  const below = scale.find((pitch) => pitchClass(pitch) === mod12(root - 1));
+  return below
+    ? atRootOctave(
+        transposePitch(below, { diatonicSteps: 0, chromaticSteps: 1 }),
+      )
+    : undefined;
 }
 
 export type HarmonicFunction =
@@ -177,7 +205,7 @@ const numerals = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII'] as const;
 const majorDiatonicPrior: Readonly<Record<number, number>> = {
   0: 1,
   2: 0.7,
-  4: 0.45,
+  4: 0.55,
   5: 0.9,
   7: 0.95,
   9: 0.85,
@@ -256,7 +284,9 @@ export function chordRole(chord: WesternChord, key: TonalKey): ChordRole {
     hasInterval(chord, 3) || (hasInterval(chord, 6) && !hasInterval(chord, 4));
   const suffix = qualitySuffix(chord);
   const numeral = degreeNumeral(key, degree, minorQuality) + suffix;
-  const colour = hasThird(chord) ? 1 : 0.6;
+  // Sus/power chords and added or extended tones are colour on a degree, not the
+  // degree's plain function; n0004 counts them as decoration in every tradition.
+  const colour = !hasThird(chord) ? 0.5 : isExtended(chord) ? 0.8 : 1;
   const index = scale.indexOf(degree);
   // An augmented triad never functions as a diatonic degree even when its tones fit.
   if (hasInterval(chord, 8) && hasInterval(chord, 4) && !hasInterval(chord, 7))
@@ -390,11 +420,5 @@ export function diatonicChord(
     (seventh ? seventhDefinitions[`${triad},${member(6)}`] : undefined) ??
     triadDefinitions[triad] ??
     'major';
-  return {
-    ...createChord('C', definitionId),
-    root: {
-      position: { ...root.position, octave: 4 },
-      spelling: rootLabel(root.position) + '4',
-    },
-  };
+  return { ...createChord('C', definitionId), root: atRootOctave(root) };
 }

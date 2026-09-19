@@ -72,23 +72,27 @@ export interface BassLine {
   readonly direction: -1 | 0 | 1;
 }
 
-/** Detect a bass line from the two chords before a position. An inverted chord
- * starts a line; two basses a step apart give it a direction. Register is
- * ignored: a bass heard as C then B is a step regardless of octave placement.
+/** Detect a bass line from the two chords before a position. Only an inverted
+ * chord is evidence that the bass is designed rather than following the roots:
+ * an inverted `before` starts a line, and a step from an inverted `earlier` into
+ * `before` continues one. Two root-position chords a step apart are root motion,
+ * not a line (n0004 §4). Register is ignored: a bass heard as C then B is a step
+ * regardless of octave placement.
  */
 export function detectBassLine(
   before: WesternChord | undefined,
   earlier: WesternChord | undefined,
 ): BassLine | undefined {
   if (!before) return undefined;
+  const inverted = (chord: WesternChord) =>
+    bassClass(chord) !== pitchClass(chord.root);
+  if (!inverted(before) && !(earlier && inverted(earlier))) return undefined;
   if (earlier) {
     const step = nearest(bassClass(earlier), bassClass(before));
     if (Math.abs(step) === 1 || Math.abs(step) === 2)
       return { direction: step > 0 ? 1 : -1 };
   }
-  return bassClass(before) === pitchClass(before.root)
-    ? undefined
-    : { direction: 0 };
+  return inverted(before) ? { direction: 0 } : undefined;
 }
 
 /** 1 for a step continuing the line, 0.5 for a step against it, 0.25 for a leap,
