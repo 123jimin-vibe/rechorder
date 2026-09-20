@@ -12,11 +12,14 @@
   min-block-size: 0;
   overflow: hidden;
   background: var(--border);
+  display: flex;
+  flex-direction: column;
 }
 
 .surface {
-  position: absolute;
-  inset: 0;
+  position: relative;
+  flex: 1;
+  min-block-size: 0;
   overflow: hidden;
   touch-action: none;
   user-select: none;
@@ -74,6 +77,46 @@
       fill: var(--on-accent);
     }
   }
+
+  &[data-key='true'] polygon {
+    fill: hsl(var(--octave-hue) 75% 76%);
+  }
+
+  &[data-completion='true'] polygon {
+    stroke: #9a600a;
+    stroke-width: 2.5;
+  }
+
+  &[data-equivalent='true'] polygon {
+    stroke: var(--accent);
+    stroke-dasharray: 5 3;
+    stroke-width: 3;
+  }
+
+  &[data-selected='true'] polygon {
+    stroke: var(--accent);
+    stroke-width: 4;
+  }
+
+  &[data-held='true'] polygon,
+  &[data-sounding='true'] polygon {
+    fill: hsl(var(--octave-hue) 55% 26%);
+  }
+
+  &[data-sounding='true'] text {
+    fill: var(--on-accent);
+  }
+}
+
+.cell text.completionLabel {
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.previousMark {
+  fill: #7950b1;
+  stroke: white;
+  stroke-width: 1;
 }
 
 .accidental {
@@ -99,41 +142,194 @@
   font-weight: 500;
 }
 
-.back {
-  position: absolute;
-  inset-block-start: max(8px, env(safe-area-inset-top));
-  inset-inline-start: max(8px, env(safe-area-inset-left));
+.header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  padding-inline-end: max(8px, env(safe-area-inset-right));
+  padding-inline-start: env(safe-area-inset-left);
+  padding-block-start: env(safe-area-inset-top);
+  background: var(--surface);
+  border-block-end: 1px solid var(--border);
+  font-size: 13px;
+}
+
+.header a {
   display: grid;
   place-items: center;
   inline-size: 44px;
   block-size: 44px;
-  border: 1px solid var(--border);
-  border-radius: 50%;
-  background: var(--surface);
-  color: var(--muted);
+  flex-shrink: 0;
+  font-size: 28px;
+  text-decoration: none;
+  color: var(--accent);
+}
 
-  svg {
-    inline-size: 24px;
-    block-size: 24px;
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 1.7;
-    stroke-linecap: round;
-    stroke-linejoin: round;
+.axes {
+  margin-inline-start: auto;
+  color: var(--muted);
+  font-size: 11px;
+  text-align: end;
+}
+
+.dock {
+  flex: 0 1 auto;
+  min-block-size: 0;
+  max-block-size: 40%;
+  overflow: auto;
+  overscroll-behavior: contain;
+  background: var(--surface);
+  border-block-start: 1px solid var(--border);
+  padding: 4px max(8px, env(safe-area-inset-right))
+    max(4px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
+
+  button,
+  select {
+    min-block-size: 44px;
+    min-inline-size: 44px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface);
+    color: var(--text);
+    padding: 6px 10px;
+    font-size: 13px;
+    cursor: pointer;
+    flex-shrink: 0;
   }
 
-  &:hover {
-    color: var(--accent);
+  button:hover:not(:disabled) {
+    background: var(--accent-soft);
+  }
+
+  button[aria-pressed='true'],
+  button[aria-expanded='true'] {
+    color: var(--on-accent);
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  button:disabled,
+  select:disabled {
+    opacity: 0.45;
+    cursor: default;
   }
 }
 
-.srOnly {
-  position: absolute;
-  inline-size: 1px;
-  block-size: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip-path: inset(50%);
+.summary,
+.actions,
+.tabs,
+.controlRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.summary {
+  min-block-size: 32px;
+  font-size: 13px;
+
+  strong {
+    flex-shrink: 0;
+    max-inline-size: 35%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  span {
+    overflow-x: auto;
+    white-space: nowrap;
+    min-inline-size: 0;
+    flex: 1;
+  }
+
+  button {
+    border-color: transparent;
+  }
+}
+
+.actions,
+.tabs {
+  overflow-x: auto;
+  padding-block: 3px;
   white-space: nowrap;
+  scrollbar-width: thin;
+}
+
+.tabs button {
+  border-color: transparent;
+}
+
+.actions {
+  display: grid;
+  grid-template-columns: repeat(4, max-content);
+}
+
+@media (max-width: 550px) {
+  .actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .actions button {
+    white-space: normal;
+    padding-inline: 6px;
+  }
+}
+
+.tabs .reference {
+  margin-inline-start: auto;
+  color: #7950b1;
+}
+
+.tools {
+  border-block-start: 1px solid var(--border);
+  padding-block: 8px;
+}
+
+.controlRow {
+  flex-wrap: wrap;
+  margin-block-end: 6px;
+
+  strong {
+    font-size: 13px;
+    min-inline-size: 85px;
+  }
+
+  select {
+    min-inline-size: 0;
+    max-inline-size: 100%;
+  }
+}
+
+.choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-block: 8px;
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.muted {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+@media (min-width: 700px) {
+  .dock {
+    padding-inline: max(16px, calc((100% - 1000px) / 2));
+  }
+
+  .tools {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 24px;
+  }
 }

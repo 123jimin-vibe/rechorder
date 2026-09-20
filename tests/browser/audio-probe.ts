@@ -16,6 +16,8 @@ declare global {
 
 /** Observe native audio, including its rendered waveform; no synthesized test output. */
 export function installAudioProbe(): void {
+  // Some platform-specific WebKit test builds omit Web Audio entirely.
+  if (typeof AudioContext === 'undefined') return;
   const contexts: AudioContext[] = [];
   const sources: { frequency: number; start: number; end: number }[] = [];
   const worklets: AudioWorkletNode[] = [];

@@ -1,9 +1,10 @@
 import { pythagoreanTuning } from '@rechorder/music';
-import type { ResolvedNote } from '@rechorder/music';
-import { cellId, type Cell } from './geometry';
+import type { PythagoreanPosition, ResolvedNote } from '@rechorder/music';
+import type { Cell } from './geometry';
 import { gridNotation } from './notation';
 
 export interface GridNote extends ResolvedNote {
+  readonly position: PythagoreanPosition;
   readonly letter: string;
   readonly accidental: string;
   readonly octave: number;
@@ -12,12 +13,60 @@ export interface GridNote extends ResolvedNote {
   readonly description: string;
 }
 
-/** Right: 3/2. Down-right: four fifths minus two octaves, or 81/64. */
-export function gridNote({ q, r }: Cell): GridNote {
-  const position = { fifths: q + 4 * r, octaves: -2 * r };
+export const layouts = {
+  thirds: {
+    name: 'Fifth + third',
+    right: '5th',
+    diagonal: 'major 3rd',
+    q: [1, 0],
+    r: [4, -2],
+  },
+  steps: {
+    name: 'Whole tone + fourth',
+    right: 'whole tone',
+    diagonal: '4th',
+    q: [2, -1],
+    r: [-1, 1],
+  },
+  octaves: {
+    name: 'Fifth + octave',
+    right: '5th',
+    diagonal: 'octave',
+    q: [1, 0],
+    r: [0, 1],
+  },
+} as const;
+export type GridLayout = keyof typeof layouts;
+
+export function pitchId(position: PythagoreanPosition): string {
+  return `${position.fifths}:${position.octaves}`;
+}
+
+export function gridPosition(
+  { q, r }: Cell,
+  layout: GridLayout = 'thirds',
+  octave = 0,
+): PythagoreanPosition {
+  const axes = layouts[layout];
+  return {
+    fifths: q * axes.q[0] + r * axes.r[0],
+    octaves: q * axes.q[1] + r * axes.r[1] + octave,
+  };
+}
+
+export function gridNote(
+  cell: Cell,
+  layout: GridLayout = 'thirds',
+  octave = 0,
+): GridNote {
+  return positionNote(gridPosition(cell, layout, octave));
+}
+
+export function positionNote(position: PythagoreanPosition): GridNote {
   const notation = gridNotation(position);
   return {
-    key: cellId({ q, r }),
+    key: pitchId(position),
+    position,
     label: notation.label,
     frequency: pythagoreanTuning.frequency(position),
     letter: notation.letter,

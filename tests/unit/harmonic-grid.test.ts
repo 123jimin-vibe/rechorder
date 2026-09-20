@@ -6,7 +6,18 @@ import {
   visibleCells,
 } from '../../apps/web/src/harmonic-grid/geometry';
 import { GridContacts } from '../../apps/web/src/harmonic-grid/contacts';
-import { gridNote } from '../../apps/web/src/harmonic-grid/mapping';
+import {
+  gridNote,
+  gridPosition,
+  pitchId,
+  positionNote,
+} from '../../apps/web/src/harmonic-grid/mapping';
+import {
+  chordCompletions,
+  invertChord,
+  keyMembers,
+  shiftOctave,
+} from '../../apps/web/src/harmonic-grid/harmony';
 import { gridNotation } from '../../apps/web/src/harmonic-grid/notation';
 
 describe('Pythagorean pitch identity', () => {
@@ -94,5 +105,85 @@ describe('unbounded hex navigation', () => {
     contacts.clear();
     expect(contacts.move(1, { x: 99, y: 99 })).toEqual({ x: 0, y: 0 });
     expect(contacts.active.size).toBe(0);
+  });
+});
+
+describe('chord design musical identity', () => {
+  const c = { fifths: 0, octaves: 0 };
+  const e = { fifths: 4, octaves: -2 };
+  const g = { fifths: 1, octaves: 0 };
+  const chord = [c, e, g];
+  const labels = (notes: readonly (typeof c)[]) =>
+    notes.map((note) => positionNote(note).label);
+
+  it('offers completions of the entire selection and keeps comma variants separate', () => {
+    const matches = chordCompletions([c, e]);
+    expect(matches.find((match) => match.label === 'C')?.fifths).toEqual([
+      0, 4, 1,
+    ]);
+    expect(matches.find((match) => match.label === 'Am')?.fifths).toEqual([
+      3, 0, 4,
+    ]);
+    expect(
+      matches.every(
+        (match) => match.fifths.includes(0) && match.fifths.includes(4),
+      ),
+    ).toBe(true);
+    expect(chordCompletions([c, { fifths: 16, octaves: -9 }])).toEqual([]);
+    expect(chordCompletions([...chord, { fifths: 12, octaves: -7 }])).toEqual(
+      [],
+    );
+    expect(
+      chordCompletions([c, { ...c, octaves: 1 }, e]).some(
+        (match) => match.label === 'C',
+      ),
+    ).toBe(true);
+    expect(keyMembers(0, 'major')).toContain(4);
+    expect(keyMembers(0, 'major')).not.toContain(16);
+    expect(keyMembers(null, 'minor')).toEqual([]);
+  });
+
+  it('maps alternative axes exactly and reaches every nearby fifth/octave coordinate', () => {
+    expect(
+      gridNote({ q: 1, r: 0 }, 'steps').frequency /
+        gridNote({ q: 0, r: 0 }).frequency,
+    ).toBeCloseTo(9 / 8, 12);
+    expect(
+      gridNote({ q: 0, r: 1 }, 'steps').frequency /
+        gridNote({ q: 0, r: 0 }).frequency,
+    ).toBeCloseTo(4 / 3, 12);
+    for (let fifths = -12; fifths <= 12; fifths++) {
+      for (let octaves = -5; octaves <= 5; octaves++) {
+        expect(
+          gridPosition(
+            { q: fifths + octaves, r: fifths + 2 * octaves },
+            'steps',
+          ),
+        ).toEqual({ fifths, octaves });
+        expect(gridPosition({ q: fifths, r: octaves }, 'octaves')).toEqual({
+          fifths,
+          octaves,
+        });
+      }
+    }
+    expect(gridNote({ q: 0, r: 0 }, 'thirds', 1).label).toBe('C5');
+    expect(gridNote({ q: 0, r: 0 }, 'thirds', -1).label).toBe('C3');
+  });
+
+  it('transposes exact pitches and preserves bass on upper-voice inversions', () => {
+    expect(labels(shiftOctave(chord, 1)!)).toEqual(['C5', 'E5', 'G5']);
+    expect(labels(shiftOctave(chord, -1, pitchId(e))!)).toEqual([
+      'C4',
+      'E3',
+      'G4',
+    ]);
+    expect(labels(invertChord(chord, 1, false)!)).toEqual(['E4', 'G4', 'C5']);
+    expect(labels(invertChord(chord, -1, false)!)).toEqual(['G3', 'C4', 'E4']);
+    expect(labels(invertChord(chord, 1, true)!)).toEqual(['C4', 'G4', 'E5']);
+    expect(invertChord(chord, -1, true)).toBeNull();
+    expect(invertChord([c], 1, false)).toBeNull();
+    expect(shiftOctave(chord, 10)).toBeNull();
+    expect(shiftOctave([c, { ...c, octaves: 1 }], 1, pitchId(c))).toBeNull();
+    expect(labels(chord)).toEqual(['C4', 'E4', 'G4']);
   });
 });
