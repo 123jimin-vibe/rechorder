@@ -16,6 +16,7 @@ const result = recommendChords({
   target: { kind: 'insert', index: 2 },
   key: { tonic: roots.find((root) => root.id === 'C')!.pitch, mode: 'major' },
   focus: 'dominant',
+  lens: 'tonal',
   limit: 4,
 });
 ```
@@ -25,13 +26,52 @@ const result = recommendChords({
 - `bass` accepts a candidate and an index at which it would replace a chord, or the progression length to follow the last chord. The candidate's actual lowest sounding pitch is preserved, including spelling and octave. Its bass must be a member of the recommended harmony; other roots and inversions are searched.
 - Omitting `key` permits uncertain major/minor inference. Explicit keys support all seven diatonic modes. `focus` keeps only chords that make one move relative to a neighbor (`dominant`, `ii-v`, `fifth-down`, `fifth-up`, `step`, `third`, `leading-tone`, `same-root`, `tritone`) or, with `color`, applied and borrowed harmony. `limit` defaults to four and accepts 0–24. Invalid indices and limits throw `RangeError`.
 - Inputs must be valid conventional chords. Results satisfy the editor's existing C1–B6, 16-note audition bounds. No audition duration is interpreted as musical rhythm.
+- `lens` is `explore` (default), `blend`, `contrast`, or `tonal`. `explore` returns four deliberately varied alternatives with a `basis` for each choice; their order is not a quality ranking, so the UI omits score bars. The other lenses return ranked choices with relative bars. The returned `assessment` describes actual sounding roughness, span, movement and roughness change where context exists.
+- Varied choices have `score: 0` and zero score components to make the absence of a shared ranking explicit; use `basis` and `assessment` to explain each choice. Only compare `score` values within one weighted-lens result.
 
 Companion exports: `chordRole(chord, key)` returns the Roman numeral, harmonic
 function and idiom prior of a chord in a key; `diatonicChord(key, degree, seventh?)`
 builds the triad or seventh on a scale degree (minor keys raise the leading tone
 for V and vii°); `motion(from, to)` names the root move between two chords.
 
-## Ranking pipeline
+## Sounding-note assessment
+
+`measureSonority(frequencies)` accepts any nonempty or empty collection of finite
+positive frequencies. It models six harmonic partials of each tone with amplitude
+`1/h` for partial `h`. For every pair of _different notes_, it sums a
+frequency-dependent roughness curve over their partial pairs, then averages by
+the number of note pairs. This is a fixed, disclosed ideal-harmonic model of
+roughness, not the measured spectrum of the bowed-string renderer or a listener
+preference score. It also returns the range between the lowest and highest
+frequencies in cents. Counting both unnormalized and averaged roughness may be
+useful later; the current UI uses the pair average so adding notes does not
+automatically increase the displayed value merely through pair count.
+
+`voiceMotion(from, to)` works in cents on the actual sounding frequencies. It
+finds the lowest-cost ordered voice match; entering or leaving a voice costs 300
+cents. Matching is allowed without names, roots, pitch-class rounding, or a
+defined key. These explicit matching choices are an engineering descriptor, not
+a claim that every musician perceives voices in this way.
+
+Blend scores a concrete voicing as `−3 × roughness − 0.25 × mean neighbor voice
+movement in semitones`. Contrast scores `3 × mean absolute roughness change from
+neighbors + 0.25 × mean neighbor voice movement in semitones`. With no neighbor,
+the movement term is zero and Contrast uses the chord's own roughness. These
+weights establish a selectable comparison within one result set. They are not
+calibrated across different progressions or instruments. Unlike the Tonal lens,
+acoustic lenses consider inversions for voice continuity and assess the chosen
+register before final ranking. Varied picks separate candidates by low roughness,
+large roughness change, small movement and tonal role, preferring distinct roots.
+It does not aggregate these aims into one goodness score.
+
+The exploratory pool also applies one add/omit degree edit (2, 4, 6, 9, 11, 13
+or omission of 3/5) to major/minor seeds at all twelve roots and to the adjacent
+or replaced user chords. It uses the editor's existing recipe operations, so an
+accepted suggestion persists normally. This expands discovery beyond the 27
+named definitions while remaining bounded; it does not yet encode arbitrary
+interval collections.
+
+## Tonal lens ranking pipeline
 
 1. Read at most four chords on each side. Infer 24 major/minor hypotheses from harmonic tone coverage, recency, resolved dominants and root-position tonic chords (an inverted chord is never tonic evidence; a key whose tonic never sounds in root position loses 0.8). Combine the three best hypotheses; weights are relative evidence, not calibrated probabilities. A possible key is exposed in the UI only with at least three distinct roots and a score margin of two. Explicit key/mode bypasses inference.
 2. Enumerate one spelling per pitch class across the basic and jazz catalogues. Prefer the chosen key's spelling and observed roots. Minor-key leading-tone roots receive the raised-seventh spelling. Remove the unchanged replacement and enforce any fixed bass.
@@ -74,9 +114,12 @@ stop stale transport.
 This implementation has no melody, rhythm, genre, phrase-goal, or explicit local
 modulation input. Auto inference considers major/minor only; select other modes
 explicitly. Borrowed chords and local tonicization are supported without claiming
-a definitive global key. Voicing search covers close-position inversions and
-register shifts, not every possible open voicing. Returned alternatives need human
-audition; a high score does not establish musical correctness.
+a definitive global key. The Tonal candidate generator uses 27 conventional
+root/quality definitions; exploratory lenses add note edits within the existing
+recipe grammar. Voicing
+search covers close-position inversions and register shifts, not every possible
+open voicing. Returned alternatives need human audition; a high score does not
+establish musical correctness.
 
 The harmonic vocabulary follows the relationships described in
 [Music Theory for the 21st-Century Classroom: Harmonic Function](https://musictheory.pugetsound.edu/mt21c/HarmonicFunction.html)

@@ -58,6 +58,11 @@ title = "Harmonic grid"
 - Offer fifth + major third (current/default), whole tone 9:8 + fourth 4:3, and fifth 3:2 + octave 2:1 axis presets. Show right and down-right intervals. Preserve selected/reference pitches when changing presets or the surface octave; stop old audio contacts before remapping.
 - Both alternative presets reach the full integer fifth/octave lattice. The original preset retains its identity; octave shifting and per-note selection controls allow voicings across its otherwise missing octave copies.
 
+### Open-ended exploration — t0036
+
+- Keep selected collections valid and playable when no conventional name matches. Identify them as unnamed, show their modeled roughness and register span, and show ordered voice movement from the retained previous collection when both are present. Measurements describe the exact sounding frequencies under the documented harmonic-partial model; they are not grades.
+- In Explore, offer distinct nearby note additions chosen for lower roughness, higher roughness and wider register from a bounded fifth-chain/octave neighborhood. Preserve every selected pitch, its exact identity and the 16-note audition limit. An addition commits to the selection and auditions it. Conventional named completions remain available in the same panel as optional interpretations; absence of a name must not suppress exploration.
+
 ### Verification
 
 - Test whole-selection matching and comma distinctions, all preset mappings, register and inversion bounds, tap versus drag/cancellation, keyboard latch, retained selections, comparison audio, and non-overlapping mobile/desktop dock geometry.

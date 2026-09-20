@@ -248,6 +248,23 @@
   }
 }
 
+.texture {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  color: var(--muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.exploration {
+  flex-basis: 100%;
+}
+
+.matchHeading {
+  font-size: 12px;
+}
+
 .actions,
 .tabs {
   overflow-x: auto;

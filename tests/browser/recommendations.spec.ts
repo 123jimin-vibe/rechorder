@@ -6,6 +6,10 @@ test('optional key settings stay silent; previews leave edits untouched and comm
 }) => {
   await page.addInitScript(installAudioProbe);
   await page.goto('./chord-progression/');
+  test.skip(
+    !(await page.evaluate(() => Boolean(window.audioProbe))),
+    'This browser build does not provide Web Audio.',
+  );
   const panel = page.getByRole('region', { name: 'Chord suggestions' });
   const candidate = page.getByLabel('Candidate chord');
   await expect(
@@ -24,6 +28,13 @@ test('optional key settings stay silent; previews leave edits untouched and comm
     .getByRole('combobox', { name: 'Mode', exact: true })
     .selectOption('minor');
   expect(await page.evaluate(() => window.audioProbe.resumeCalls)).toBe(0);
+  await expect(
+    panel.getByRole('combobox', { name: 'Suggestion lens' }),
+  ).toHaveValue('explore');
+  await expect(panel.getByRole('meter')).toHaveCount(0);
+  await panel
+    .getByRole('combobox', { name: 'Suggestion lens' })
+    .selectOption('blend');
   const meters = panel.getByRole('meter', {
     name: /^Relative score for /,
   });
@@ -256,9 +267,10 @@ test('function pads design key-relative chords and move chips narrow suggestions
   ).toBeDisabled();
   await pads.getByRole('button', { name: 'Function V (G)' }).click();
   await expect(candidate.locator('strong')).toHaveText('G');
-  await expect
-    .poll(() => page.evaluate(() => window.audioProbe.sources.length))
-    .toBeGreaterThan(0);
+  if (await page.evaluate(() => Boolean(window.audioProbe)))
+    await expect
+      .poll(() => page.evaluate(() => window.audioProbe.sources.length))
+      .toBeGreaterThan(0);
   await pads.getByRole('button', { name: 'Seventh chords' }).click();
   await pads.getByRole('button', { name: 'Function ii7 (Dm7)' }).click();
   await expect(candidate.locator('strong')).toHaveText('Dm7');
@@ -267,6 +279,9 @@ test('function pads design key-relative chords and move chips narrow suggestions
     .getByRole('combobox', { name: 'Key', exact: true })
     .selectOption('C');
   await expect(pads.locator('legend')).toHaveText('Function C major');
+  await panel
+    .getByRole('combobox', { name: 'Suggestion lens' })
+    .selectOption('tonal');
   await panel.getByRole('button', { name: 'ii–V motion' }).click();
   const previews = panel.getByRole('button', { name: /^Preview / });
   await expect(previews.first()).toHaveAccessibleName('Preview G7');

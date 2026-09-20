@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'preact/hooks';
+import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { AuditionController } from '../audio/audition';
 import { GridContacts } from './contacts';
 import {
@@ -21,7 +21,10 @@ import {
 } from './mapping';
 import {
   chordCompletions,
+  chordMovement,
   chordName,
+  chordProfile,
+  exploreAdditions,
   invertChord,
   keyMembers,
   shiftOctave,
@@ -85,12 +88,16 @@ export function HarmonicGridPage({
   const focusedNote = gridNote(focus, layout, octave);
   const cells = visibleCells(size.width, size.height, origin);
   const heldIds = new Set(held.map(cellId));
-  const candidate = uniquePitches([
-    ...selected,
-    ...held
-      .map((cell) => gridPosition(cell, layout, octave))
-      .filter((note) => isPlayable(positionNote(note))),
-  ]).slice(0, 16);
+  const candidate = useMemo(
+    () =>
+      uniquePitches([
+        ...selected,
+        ...held
+          .map((cell) => gridPosition(cell, layout, octave))
+          .filter((note) => isPlayable(positionNote(note))),
+      ]).slice(0, 16),
+    [selected, held, layout, octave],
+  );
   const selectedIds = new Set(selected.map(pitchId));
   const selectedFifths = new Set(candidate.map((note) => note.fifths));
   const previousFifths = new Set(previous.map((note) => note.fifths));
@@ -99,6 +106,15 @@ export function HarmonicGridPage({
   const matches = chosen ? [chosen] : completions;
   const scale = keyMembers(tonic, mode);
   const name = chordName(candidate);
+  const profile = useMemo(() => chordProfile(candidate), [candidate]);
+  const explorations = useMemo(() => exploreAdditions(candidate), [candidate]);
+  const movement = useMemo(
+    () =>
+      previous.length && candidate.length
+        ? chordMovement(previous, candidate)
+        : null,
+    [previous, candidate],
+  );
 
   function refreshHeld() {
     setHeld(
@@ -405,7 +421,9 @@ export function HarmonicGridPage({
       </div>
       <section class={styles['dock']} aria-label="Chord design">
         <div class={styles['summary']}>
-          <strong>{name || 'Chord'}</strong>
+          <strong>
+            {name || (candidate.length ? 'Unnamed chord' : 'Chord')}
+          </strong>
           <span aria-label="Selected notes" aria-live="polite">
             {sortPitches(candidate)
               .map((note) => positionNote(note).label)
@@ -419,6 +437,17 @@ export function HarmonicGridPage({
             Clear
           </button>
         </div>
+        {candidate.length > 0 && (
+          <div class={styles['texture']} aria-label="Chord texture">
+            <span>Roughness {profile.roughness.toFixed(3)}</span>
+            <span>Span {(profile.spanCents / 100).toFixed(1)} semitones</span>
+            {movement !== null && (
+              <span>
+                From previous {(movement / 100).toFixed(1)} semitones/voice
+              </span>
+            )}
+          </div>
+        )}
         <div class={styles['actions']}>
           <button
             type="button"
@@ -481,7 +510,7 @@ export function HarmonicGridPage({
               onClick={() => setPanel(panel === tab ? null : tab)}
             >
               {tab === 'chords'
-                ? 'Matches'
+                ? 'Explore'
                 : tab === 'voicing'
                   ? 'Voicing'
                   : 'Grid'}{' '}
@@ -508,12 +537,48 @@ export function HarmonicGridPage({
           <div id="grid-tools" class={styles['tools']}>
             {panel === 'chords' && (
               <>
+                <div class={styles['exploration']}>
+                  <strong>Nearby additions</strong>
+                  <div class={styles['choices']}>
+                    {explorations.map(({ kind, note, profile: option }) => {
+                      const label = positionNote(note).label;
+                      const purpose =
+                        kind === 'blend'
+                          ? 'Blend'
+                          : kind === 'edge'
+                            ? 'More roughness'
+                            : 'Wider range';
+                      return (
+                        <button
+                          type="button"
+                          key={kind}
+                          aria-label={`Add ${label} for ${purpose.toLowerCase()}`}
+                          title={`Resulting roughness ${option.roughness.toFixed(3)} · span ${(option.spanCents / 100).toFixed(1)} semitones`}
+                          onClick={() => {
+                            changeChord([...candidate, note], true);
+                            setLatch(true);
+                          }}
+                        >
+                          {purpose} · +{label}
+                        </button>
+                      );
+                    })}
+                    {!explorations.length && (
+                      <span class={styles['muted']}>
+                        {candidate.length
+                          ? 'Selection is full'
+                          : 'Select a note to explore'}
+                      </span>
+                    )}
+                  </div>
+                </div>
                 <div class={styles['legend']}>
                   <span>━ Selected</span>
                   <span>┄ Octaves</span>
                   <span>◇ Matches</span>
                   <span>● Previous</span>
                 </div>
+                <strong class={styles['matchHeading']}>Named matches</strong>
                 <div class={styles['choices']}>
                   {completions.length ? (
                     completions.map((chord) => (
@@ -532,7 +597,7 @@ export function HarmonicGridPage({
                   ) : (
                     <span class={styles['muted']}>
                       {candidate.length
-                        ? 'No matching chord'
+                        ? 'No common name for this selection'
                         : 'No notes selected'}
                     </span>
                   )}

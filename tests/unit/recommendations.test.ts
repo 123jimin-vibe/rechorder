@@ -1,19 +1,27 @@
 import { describe, expect, it } from 'vitest';
 import {
   chordRole,
+  chordData,
+  chordFromData,
   chordSymbol,
   createChord,
   diatonicChord,
   inferTonality,
   isAuditionable,
   motion,
-  recommendChords,
+  recommendChords as scoreChords,
+  measureSonority,
+  voiceMotion,
   roots,
   setToneVoicing,
   voiceChord,
   voiceLeadingDistance,
 } from '@rechorder/music';
-import type { TonalKey, WesternChord } from '@rechorder/music';
+import type {
+  RecommendationRequest,
+  TonalKey,
+  WesternChord,
+} from '@rechorder/music';
 import { chromaticPosition } from '../../packages/music/src/western';
 
 const key = (id: string, mode: TonalKey['mode'] = 'major'): TonalKey => ({
@@ -21,10 +29,72 @@ const key = (id: string, mode: TonalKey['mode'] = 'major'): TonalKey => ({
   mode,
 });
 const c = createChord;
+const recommendChords = (request: RecommendationRequest) =>
+  scoreChords({ ...request, lens: 'tonal' });
 const names = (chords: readonly { chord: WesternChord }[]) =>
   chords.map((item) => chordSymbol(item.chord));
 
 describe('contextual recommendations', () => {
+  it('measures arbitrary sounding collections and distinguishes register and transition', () => {
+    expect(measureSonority([])).toEqual({ roughness: 0, spanCents: 0 });
+    const low = measureSonority([220, 275, 330, 440, 466]);
+    const high = measureSonority([440, 550, 660, 880, 932]);
+    expect(low.spanCents).toBeCloseTo(high.spanCents);
+    expect(low.roughness).not.toBeCloseTo(high.roughness);
+    expect(voiceMotion([220, 330], [220, 330])).toBe(0);
+    expect(voiceMotion([220, 330], [230, 350])).toBeLessThan(
+      voiceMotion([220, 330], [440, 660]),
+    );
+  });
+  it('offers distinct acoustic and tonal lenses without a named-chord goodness claim', () => {
+    const request = {
+      progression: [c('C', 'major'), c('G', 'major')],
+      target: { kind: 'insert' as const, index: 2 },
+      key: key('C'),
+    };
+    const varied = scoreChords(request);
+    expect(varied.recommendations.map((item) => item.basis)).toEqual([
+      'blend',
+      'contrast',
+      'voices',
+      'tonal',
+    ]);
+    expect(varied.recommendations.every((item) => item.score === 0)).toBe(true);
+    expect(
+      varied.recommendations.every((item) => item.assessment !== undefined),
+    ).toBe(true);
+    expect(
+      new Set(varied.recommendations.map((item) => item.chord.root.spelling))
+        .size,
+    ).toBe(4);
+    const blended = scoreChords({ ...request, lens: 'blend' });
+    const contrasted = scoreChords({ ...request, lens: 'contrast' });
+    expect(
+      contrasted.recommendations[0]!.assessment!.roughnessChange,
+    ).toBeGreaterThan(blended.recommendations[0]!.assessment!.roughnessChange!);
+    for (const result of [blended, contrasted]) {
+      const scores = result.recommendations.map((item) => item.score);
+      expect(scores).toEqual([...scores].sort((a, b) => b - a));
+      for (const item of result.recommendations)
+        expect(item.score).toBeCloseTo(
+          Object.values(item.components).reduce((a, b) => a + b, 0),
+        );
+    }
+    const generated = scoreChords({
+      progression: [],
+      target: { kind: 'insert', index: 0 },
+      lens: 'contrast',
+      limit: 24,
+    });
+    const edited = generated.recommendations.find(
+      (item) => item.chord.additions.length || item.chord.omissions.length,
+    )?.chord;
+    expect(edited).toBeDefined();
+    expect(chordFromData(chordData(edited!))).toEqual(edited);
+    expect(
+      recommendChords(request).recommendations[0]!.chord.root.spelling,
+    ).toBe('C4');
+  });
   it('distinguishes dominant sevenths and ii–V from plain fifth motion', () => {
     expect(motion(c('G', 'dominant7'), c('C', 'major')).move).toBe('dominant');
     expect(motion(c('G', 'major7'), c('C', 'major')).move).toBe('fifth-down');

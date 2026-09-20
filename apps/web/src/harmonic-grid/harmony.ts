@@ -1,8 +1,68 @@
-import type { PythagoreanPosition } from '@rechorder/music';
+import { measureSonority, voiceMotion } from '@rechorder/music';
+import type { PythagoreanPosition, SonorityProfile } from '@rechorder/music';
 import { gridNotation } from './notation';
 import { isPlayable, pitchId, positionNote } from './mapping';
 
 export type GridChord = readonly PythagoreanPosition[];
+
+export function chordProfile(notes: GridChord): SonorityProfile {
+  return measureSonority(notes.map((note) => positionNote(note).frequency));
+}
+
+export function chordMovement(from: GridChord, to: GridChord): number {
+  return voiceMotion(
+    from.map((note) => positionNote(note).frequency),
+    to.map((note) => positionNote(note).frequency),
+  );
+}
+
+export interface Exploration {
+  readonly kind: 'blend' | 'edge' | 'wider';
+  readonly note: PythagoreanPosition;
+  readonly profile: SonorityProfile;
+}
+
+/** Nearby fifth-chain and octave movements, with no quality-template filter. */
+export function exploreAdditions(notes: GridChord): readonly Exploration[] {
+  if (!notes.length || notes.length >= 16) return [];
+  const seen = new Set(notes.map(pitchId));
+  const options: { note: PythagoreanPosition; profile: SonorityProfile }[] = [];
+  for (const anchor of notes) {
+    for (let fifths = -2; fifths <= 2; fifths++) {
+      for (let octaves = -1; octaves <= 1; octaves++) {
+        const note = {
+          fifths: anchor.fifths + fifths,
+          octaves: anchor.octaves + octaves,
+        };
+        const id = pitchId(note);
+        if (seen.has(id)) continue;
+        seen.add(id);
+        if (!isPlayable(positionNote(note))) continue;
+        options.push({ note, profile: chordProfile([...notes, note]) });
+      }
+    }
+  }
+  const chosen = new Set<string>();
+  const pick = (
+    kind: Exploration['kind'],
+    compare: (
+      a: (typeof options)[number],
+      b: (typeof options)[number],
+    ) => number,
+  ): Exploration | undefined => {
+    const best = options
+      .filter((option) => !chosen.has(pitchId(option.note)))
+      .sort(compare)[0];
+    if (!best) return undefined;
+    chosen.add(pitchId(best.note));
+    return { kind, ...best };
+  };
+  return [
+    pick('blend', (a, b) => a.profile.roughness - b.profile.roughness),
+    pick('edge', (a, b) => b.profile.roughness - a.profile.roughness),
+    pick('wider', (a, b) => b.profile.spanCents - a.profile.spanCents),
+  ].filter((item): item is Exploration => item !== undefined);
+}
 const qualities = [
   { suffix: '', degrees: [0, 4, 1] },
   { suffix: 'm', degrees: [0, -3, 1] },

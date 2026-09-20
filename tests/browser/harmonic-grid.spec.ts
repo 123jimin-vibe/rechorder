@@ -164,6 +164,24 @@ async function tapCell(page: Page, id: string) {
   );
 }
 
+test('explores additions to an unnamed five-note collection', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1000, height: 760 });
+  await page.goto('./harmonic-grid/');
+  await page.getByRole('button', { name: 'Latch', exact: true }).click();
+  for (const q of [-2, -1, 0, 1, 2]) await tapCell(page, `${q},0`);
+  await expect(page.getByText('Unnamed chord')).toBeVisible();
+  await expect(page.getByLabel('Chord texture')).toContainText('Roughness');
+  await page.getByRole('button', { name: 'Explore' }).click();
+  await expect(
+    page.getByText('No common name for this selection'),
+  ).toBeVisible();
+  await page.getByRole('button', { name: /^Add .* for blend$/ }).click();
+  const notes = await page.getByLabel('Selected notes').textContent();
+  expect(notes!.split(' · ')).toHaveLength(6);
+});
+
 test('native touch latches a chord and focus loss stops comparison without losing selections', async ({
   page,
   browserName,
@@ -212,6 +230,7 @@ test('native touch latches a chord and focus loss stops comparison without losin
     page.getByRole('button', { name: '▶ Previous → Chord' }),
   ).toBeVisible();
   await expect(page.getByLabel('Selected notes')).toHaveText('E4');
+  await expect(page.getByLabel('Chord texture')).toContainText('From previous');
   await expect(page.locator('[data-cell="0,0"]')).toHaveAttribute(
     'data-previous',
     'true',
@@ -239,11 +258,11 @@ test('latches notes, previews whole-chord matches, and compares the previous cho
     'true',
   );
   await expect(page.locator('[data-selected="true"]')).toHaveCount(2);
-  await page.getByRole('button', { name: 'Matches' }).click();
+  await page.getByRole('button', { name: 'Explore' }).click();
   await page.getByRole('button', { name: 'C', exact: true }).click();
   await page.getByRole('button', { name: 'Use C', exact: true }).click();
   await expect(page.getByLabel('Selected notes')).toHaveText('C4 · E4 · G4');
-  await page.getByRole('button', { name: 'Matches' }).click();
+  await page.getByRole('button', { name: 'Explore' }).click();
   await page.getByRole('button', { name: 'Keep as previous' }).click();
   await expect(page.getByLabel('Selected notes')).toHaveText('—');
   await expect(page.locator('[data-cell="0,0"]')).toHaveAttribute(
@@ -269,7 +288,7 @@ test('latches notes, previews whole-chord matches, and compares the previous cho
   await page.getByRole('button', { name: 'Grid ▸' }).click();
   await page.getByLabel('Layout', { exact: true }).selectOption('steps');
   await page.getByRole('button', { name: 'Grid ▾' }).click();
-  await page.getByRole('button', { name: 'Matches' }).click();
+  await page.getByRole('button', { name: 'Explore' }).click();
   await page.screenshot({ path: testInfo.outputPath('chord-design.png') });
 });
 
@@ -335,21 +354,20 @@ test('keyboard latch toggles and dragging or cancellation does not select notes'
   await page.mouse.up();
   await expect(page.getByLabel('Selected notes')).toHaveText('—');
   await page.mouse.move(x, y);
-  const pointerId = page.evaluate(
-    () =>
-      new Promise<number>((resolve) => {
-        document
-          .querySelector('[role="application"]')!
-          .addEventListener(
-            'pointerdown',
-            (event) => resolve((event as PointerEvent).pointerId),
-            { once: true },
-          );
-      }),
-  );
+  await grid.evaluate((element) => {
+    element.addEventListener(
+      'pointerdown',
+      (event) =>
+        element.setAttribute(
+          'data-last-pointer-id',
+          String((event as PointerEvent).pointerId),
+        ),
+      { once: true },
+    );
+  });
   await page.mouse.down();
   await grid.dispatchEvent('pointercancel', {
-    pointerId: await pointerId,
+    pointerId: Number(await grid.getAttribute('data-last-pointer-id')),
     button: 0,
   });
   await page.mouse.up();
@@ -366,7 +384,7 @@ test('controls reserve their own space on small portrait and landscape screens',
     { width: 844, height: 390 },
   ]) {
     await page.setViewportSize(viewport);
-    for (const name of ['Grid', 'Voicing', 'Matches']) {
+    for (const name of ['Grid', 'Voicing', 'Explore']) {
       await page.getByRole('button', { name: new RegExp(`^${name}`) }).click();
       const grid = (await page.getByRole('application').boundingBox())!;
       const dock = (await page
@@ -382,7 +400,7 @@ test('controls reserve their own space on small portrait and landscape screens',
     await page.screenshot({
       path: testInfo.outputPath(`controls-${viewport.width}.png`),
     });
-    await page.getByRole('button', { name: 'Matches' }).click();
+    await page.getByRole('button', { name: 'Explore' }).click();
   }
 });
 

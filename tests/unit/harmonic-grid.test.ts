@@ -14,6 +14,9 @@ import {
 } from '../../apps/web/src/harmonic-grid/mapping';
 import {
   chordCompletions,
+  chordMovement,
+  chordProfile,
+  exploreAdditions,
   invertChord,
   keyMembers,
   shiftOctave,
@@ -115,6 +118,20 @@ describe('chord design musical identity', () => {
   const chord = [c, e, g];
   const labels = (notes: readonly (typeof c)[]) =>
     notes.map((note) => positionNote(note).label);
+
+  it('offers additions and measurements even when a five-class selection has no name', () => {
+    const unnamed = [-2, -1, 0, 1, 2].map((fifths) => ({ fifths, octaves: 0 }));
+    expect(chordCompletions(unnamed)).toEqual([]);
+    const ideas = exploreAdditions(unnamed);
+    expect(ideas.map((item) => item.kind)).toEqual(['blend', 'edge', 'wider']);
+    expect(new Set(ideas.map((item) => pitchId(item.note))).size).toBe(3);
+    expect(ideas.every((item) => item.profile.spanCents > 0)).toBe(true);
+    expect(chordProfile(unnamed).roughness).toBeGreaterThan(0);
+    expect(chordMovement(unnamed, unnamed)).toBe(0);
+    expect(
+      chordMovement(unnamed, [...unnamed, ideas[0]!.note]),
+    ).toBeGreaterThan(0);
+  });
 
   it('offers completions of the entire selection and keeps comma variants separate', () => {
     const matches = chordCompletions([c, e]);

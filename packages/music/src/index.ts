@@ -6,6 +6,8 @@ export type {
   ResolvedNote,
 } from './model';
 export { resolvePitches } from './model';
+export { measureSonority, voiceMotion } from './sonority';
+export type { SonorityProfile } from './sonority';
 export { pythagoreanPitch, pythagoreanTuning } from './pythagorean';
 export type { PythagoreanPitch, PythagoreanPosition } from './pythagorean';
 export type {
@@ -65,6 +67,7 @@ export type {
   RecommendationTarget,
   RecommendationRequest,
   RecommendationFocus,
+  RecommendationLens,
   RecommendationReason,
   RecommendationScore,
   ChordRecommendation,
