@@ -138,7 +138,7 @@ for (const turn of [0, 1, 2, 3]) {
   });
 }
 
-test('touch contacts keep independent note and scrolling lifecycles', async ({
+test('two touched notes pause row scrolling until one releases', async ({
   page,
   browserName,
 }) => {
@@ -203,6 +203,14 @@ test('touch contacts keep independent note and scrolling lifecycles', async ({
         send(dragged, 'touchmove', [first, moved], [moved]);
       }
       send(dragged, 'touchcancel', [first], [second]);
+      (window as typeof window & { moveHeldTouch: () => void }).moveHeldTouch =
+        () => {
+          const moved = contact(31, held, {
+            x: heldPoint.x - 80,
+            y: heldPoint.y,
+          });
+          send(held, 'touchmove', [moved], [moved]);
+        };
       (
         window as typeof window & { finishHeldTouch: () => void }
       ).finishHeldTouch = () => send(held, 'touchend', [], [first]);
@@ -210,17 +218,115 @@ test('touch contacts keep independent note and scrolling lifecycles', async ({
     { heldPoint, draggedPoint },
   );
 
+  expect(await row.evaluate((element) => element.scrollLeft)).toBe(before);
+  await expect(dragged).toHaveAttribute('aria-pressed', 'false');
+  await expect(held).toHaveAttribute('aria-pressed', 'true');
+  await page.evaluate(() =>
+    (window as typeof window & { moveHeldTouch: () => void }).moveHeldTouch(),
+  );
   await expect
     .poll(() => row.evaluate((element) => element.scrollLeft))
     .toBeGreaterThan(before + 70);
-  await expect(dragged).toHaveAttribute('aria-pressed', 'false');
-  await expect(held).toHaveAttribute('aria-pressed', 'true');
   await page.evaluate(() =>
     (
       window as typeof window & { finishHeldTouch: () => void }
     ).finishHeldTouch(),
   );
   await expect(held).toHaveAttribute('aria-pressed', 'false');
+});
+
+test('two notes in the lower row do not lock the upper row', async ({
+  page,
+  browserName,
+}) => {
+  test.skip(browserName !== 'chromium', 'Uses Chromium native multitouch.');
+  await page.addInitScript(installAudioProbe);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('./piano/');
+  const upper = page.locator('[data-keyboard-scroll="piano:upper"]');
+  const lower = page.locator('[data-keyboard-scroll="piano:lower"]');
+  const upperKey = upper.getByRole('button', {
+    name: 'Play E4',
+    exact: true,
+  });
+  const lowerC = lower.getByRole('button', { name: 'Play C4', exact: true });
+  const lowerG = lower.getByRole('button', { name: 'Play G4', exact: true });
+  const first = { id: 41, ...(await keyPoint(lowerC, 0)) };
+  const second = { id: 42, ...(await keyPoint(lowerG, 0)) };
+  const third = { id: 43, ...(await keyPoint(upperKey, 0)) };
+  const beforeLower = await lower.evaluate((element) => element.scrollLeft);
+  const beforeUpper = await upper.evaluate((element) => element.scrollLeft);
+  const input = await page.context().newCDPSession(page);
+  await input.send('Input.dispatchTouchEvent', {
+    type: 'touchStart',
+    touchPoints: [first],
+  });
+  await input.send('Input.dispatchTouchEvent', {
+    type: 'touchStart',
+    touchPoints: [first, second],
+  });
+  await input.send('Input.dispatchTouchEvent', {
+    type: 'touchStart',
+    touchPoints: [first, second, third],
+  });
+  await expect(lowerC).toHaveAttribute('aria-pressed', 'true');
+  await expect(lowerG).toHaveAttribute('aria-pressed', 'true');
+  await expect(upperKey).toHaveAttribute('aria-pressed', 'true');
+  expect(
+    await lower.evaluate((element) => getComputedStyle(element).overflowX),
+  ).toBe('hidden');
+  expect(
+    await upper.evaluate((element) => getComputedStyle(element).overflowX),
+  ).toBe('auto');
+  for (const distance of [20, 40, 60, 80]) {
+    await input.send('Input.dispatchTouchEvent', {
+      type: 'touchMove',
+      touchPoints: [
+        first,
+        { ...second, x: second.x - distance },
+        { ...third, x: third.x - distance },
+      ],
+    });
+  }
+  expect(await lower.evaluate((element) => element.scrollLeft)).toBe(
+    beforeLower,
+  );
+  await expect
+    .poll(() => upper.evaluate((element) => element.scrollLeft))
+    .toBeGreaterThan(beforeUpper + 70);
+  const lowerBox = (await lower.boundingBox())!;
+  await page.mouse.move(
+    lowerBox.x + lowerBox.width / 2,
+    lowerBox.y + lowerBox.height / 2,
+  );
+  await page.mouse.wheel(72, 0);
+  expect(await lower.evaluate((element) => element.scrollLeft)).toBe(
+    beforeLower,
+  );
+  await input.send('Input.dispatchTouchEvent', {
+    type: 'touchEnd',
+    touchPoints: [{ ...second, x: second.x - 80 }],
+  });
+  await expect(lowerG).toHaveAttribute('aria-pressed', 'false');
+  expect(
+    await lower.evaluate((element) => getComputedStyle(element).overflowX),
+  ).toBe('auto');
+  await input.send('Input.dispatchTouchEvent', {
+    type: 'touchMove',
+    touchPoints: [
+      { ...first, x: first.x - 80 },
+      { ...third, x: third.x - 80 },
+    ],
+  });
+  await expect
+    .poll(() => lower.evaluate((element) => element.scrollLeft))
+    .toBeGreaterThan(beforeLower + 70);
+  await input.send('Input.dispatchTouchEvent', {
+    type: 'touchEnd',
+    touchPoints: [],
+  });
+  await expect(lowerC).toHaveAttribute('aria-pressed', 'false');
+  await expect(upperKey).toHaveAttribute('aria-pressed', 'false');
 });
 
 test('mouse dragging scrolls without releasing the starting key', async ({

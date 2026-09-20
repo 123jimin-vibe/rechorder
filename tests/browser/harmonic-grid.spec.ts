@@ -99,8 +99,8 @@ test('real multitouch sustains a chord while dragging, releases independently, a
   }
   await expect
     .poll(async () => Number(await grid.getAttribute('data-pan-x')))
-    .toBeCloseTo(-80, 3);
-  await expect(grid).toHaveAttribute('data-pan-y', '80');
+    .toBeCloseTo(0, 3);
+  await expect(grid).toHaveAttribute('data-pan-y', '0');
   await expect(page.locator('[data-cell="0,0"]')).toHaveAttribute(
     'data-held',
     'true',
@@ -128,7 +128,8 @@ test('real multitouch sustains a chord while dragging, releases independently, a
   });
   await expect
     .poll(async () => Number(await grid.getAttribute('data-pan-x')))
-    .toBeCloseTo(-60, 3);
+    .toBeCloseTo(20, 3);
+  await expect(grid).toHaveAttribute('data-pan-y', '0');
   await input.send('Input.dispatchTouchEvent', {
     type: 'touchCancel',
     touchPoints: [],

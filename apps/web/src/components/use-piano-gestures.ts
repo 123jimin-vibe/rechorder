@@ -1,4 +1,4 @@
-import { useContext, useEffect, useRef } from 'preact/hooks';
+import { useCallback, useContext, useEffect, useRef } from 'preact/hooks';
 import type { RefObject } from 'preact';
 import type { ResolvedNote } from '@rechorder/music';
 import type { PianoPlayer } from './piano-keyboard';
@@ -7,9 +7,11 @@ import { inlineMovement, ViewOrientation } from './view-orientation';
 interface Gesture {
   readonly clientX: number;
   readonly clientY: number;
-  readonly start: number;
-  readonly scroll: number;
+  start: number;
+  scroll: number;
+  position: number;
   readonly source: string;
+  readonly notePressed: boolean;
   readonly touchCompatible: boolean;
   dragging: boolean;
 }
@@ -21,17 +23,42 @@ export function usePianoGestures(
   viewport: RefObject<HTMLDivElement>,
   controller: PianoPlayer,
   sourceId: string,
+  keyboardSources: RefObject<Set<string>>,
 ) {
   const turn = useContext(ViewOrientation);
   const gestures = useRef(new Map<string, Gesture>());
+  const scrollLocked = useRef(false);
   const contactId = (kind: ContactKind, id: number) => `${kind}:${id}`;
   const source = (kind: ContactKind, id: number) => `${sourceId}:${kind}:${id}`;
+
+  const pressChanged = useCallback(() => {
+    const pressed =
+      (keyboardSources.current?.size ?? 0) +
+      [...gestures.current.values()].filter((gesture) => gesture.notePressed)
+        .length;
+    const locked = pressed >= 2;
+    if (locked === scrollLocked.current) return;
+    // Preact refs are mutable lifecycle storage; the React rule misses this hook.
+    // oxlint-disable-next-line react/immutability
+    scrollLocked.current = locked;
+    const element = viewport.current;
+    // The viewport is managed imperatively alongside its scroll position.
+    // oxlint-disable-next-line react/immutability
+    if (element) element.style.overflowX = locked ? 'hidden' : '';
+    const scroll = element?.scrollLeft ?? 0;
+    for (const gesture of gestures.current.values()) {
+      gesture.start = gesture.position;
+      gesture.scroll = scroll;
+      gesture.dragging = false;
+    }
+  }, [keyboardSources, viewport]);
 
   useEffect(() => {
     const active = gestures.current;
     const clear = () => {
       for (const gesture of active.values()) controller.release(gesture.source);
       active.clear();
+      pressChanged();
     };
     const visibility = () => {
       if (document.hidden) clear();
@@ -43,13 +70,17 @@ export function usePianoGestures(
       window.removeEventListener('blur', clear);
       document.removeEventListener('visibilitychange', visibility);
     };
-  }, [controller, sourceId, turn]);
+  }, [controller, sourceId, turn, pressChanged]);
 
   useEffect(() => {
     const element = viewport.current;
     if (!element) return;
     const wheel = (event: WheelEvent) => {
       if (event.ctrlKey) return;
+      if (scrollLocked.current) {
+        event.preventDefault();
+        return;
+      }
       const along = inlineMovement(event.deltaX, event.deltaY, turn);
       const delta = along || (turn % 2 === 0 ? event.deltaY : event.deltaX);
       const scale =
@@ -85,16 +116,20 @@ export function usePianoGestures(
     const element = viewport.current;
     const key = contactId(kind, id);
     if (!element || gestures.current.has(key)) return;
+    const position = inlineMovement(clientX, clientY, turn);
     const gesture = {
       clientX,
       clientY,
-      start: inlineMovement(clientX, clientY, turn),
+      start: position,
       scroll: element.scrollLeft,
+      position,
       source: source(kind, id),
+      notePressed: Boolean(note),
       touchCompatible,
       dragging: false,
     };
     gestures.current.set(key, gesture);
+    pressChanged();
     if (note) void controller.press(gesture.source, note);
   }
 
@@ -102,6 +137,8 @@ export function usePianoGestures(
     const element = viewport.current;
     const gesture = gestures.current.get(contactId(kind, id));
     if (!element || !gesture) return;
+    gesture.position = position;
+    if (scrollLocked.current) return;
     const delta = position - gesture.start;
     if (!gesture.dragging && Math.abs(delta) >= 8) {
       // One scrolling contact per row; other contacts retain their note ownership.
@@ -118,6 +155,7 @@ export function usePianoGestures(
     if (!gesture) return;
     gestures.current.delete(key);
     controller.release(gesture.source);
+    pressChanged();
   }
 
   function pointerStart(event: PointerEvent, note?: ResolvedNote) {
@@ -196,6 +234,7 @@ export function usePianoGestures(
     pointerStart,
     pointerMove,
     pointerEnd,
+    pressChanged,
     touchStart,
     touchMove,
     touchEnd,

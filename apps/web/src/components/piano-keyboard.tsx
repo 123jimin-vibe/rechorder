@@ -43,23 +43,31 @@ export function PianoKeyboard({
 }) {
   const viewport = useRef<HTMLDivElement>(null);
   const keyboardSources = useRef(new Set<string>());
-  const gestures = usePianoGestures(viewport, controller, sourceId);
+  const gestures = usePianoGestures(
+    viewport,
+    controller,
+    sourceId,
+    keyboardSources,
+  );
+  const { pressChanged } = gestures;
   const releaseKeyboardSource = (source: string) => {
     if (!keyboardSources.current.delete(source)) return;
     controller.release(source);
+    pressChanged();
   };
   useEffect(() => {
     const active = keyboardSources.current;
     const releaseAll = () => {
       for (const source of active) controller.release(source);
       active.clear();
+      pressChanged();
     };
     window.addEventListener('blur', releaseAll);
     return () => {
       releaseAll();
       window.removeEventListener('blur', releaseAll);
     };
-  }, [controller, sourceId]);
+  }, [controller, sourceId, pressChanged]);
   function showOctave(octave: number) {
     const element = viewport.current;
     const key = element?.querySelector<HTMLElement>(
@@ -147,6 +155,7 @@ export function PianoKeyboard({
                       !keyboardSources.current.has(keyboardSource)
                     ) {
                       keyboardSources.current.add(keyboardSource);
+                      pressChanged();
                       void controller.press(keyboardSource, note);
                     }
                   }

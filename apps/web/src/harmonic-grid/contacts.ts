@@ -14,6 +14,7 @@ export class GridContacts {
   start(id: number, cell: Cell, point: Point): boolean {
     if (this.active.has(id)) return false;
     this.active.set(id, { cell, start: point, previous: point });
+    if (this.active.size >= 2) this.dragging = null;
     return true;
   }
 
@@ -23,6 +24,7 @@ export class GridContacts {
     const previous = contact.previous;
     contact.previous = point;
     if (point.x === previous.x && point.y === previous.y) return { x: 0, y: 0 };
+    if (this.active.size >= 2) return { x: 0, y: 0 };
     if (
       this.dragging === null &&
       Math.hypot(point.x - contact.start.x, point.y - contact.start.y) >= 6

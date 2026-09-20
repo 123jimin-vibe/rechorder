@@ -14,8 +14,8 @@ title = "Harmonic grid"
 
 - Serve `/harmonic-grid/` as a static page linked from the home feature list.
 - Fill the viewport with a hexagonal grid that can be panned in both axes without spatial boundaries.
-- Pressing a note sounds it until that contact releases or cancels. Holding and dragging pans the grid while sustaining the original note; moving across cells does not retrigger notes.
-- Support independent simultaneous contacts. One moving contact controls panning at a time; stationary contacts retain their notes, and changing the dragging contact must not jump the view.
+- Pressing a note sounds it until that contact releases or cancels. Holding and dragging pans the grid while sustaining the original note; moving across cells does not retrigger notes. Disable panning while two or more notes are pressed, then allow the remaining contact to pan without a jump.
+- Support independent simultaneous contacts. Stationary contacts retain their notes, and changing the dragging contact must not jump the view.
 - Release held notes on cancellation, lost capture, focus loss, page hiding, and navigation. Keep audio silent on load.
 - Preserve keyboard access and visible focus without adding a toolbar or instructions over the playing area.
 
@@ -35,4 +35,4 @@ title = "Harmonic grid"
 
 ## Verification
 
-- Verify full viewport coverage, bounded rendering after long drags, static reload, actual multitouch panning and independent release, keyboard access, cancellation, and absence of application/audio errors.
+- Verify full viewport coverage, bounded rendering after long drags, static reload, multi-note panning lock and independent release, keyboard access, cancellation, and absence of application/audio errors.

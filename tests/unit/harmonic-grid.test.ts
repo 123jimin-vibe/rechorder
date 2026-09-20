@@ -80,11 +80,12 @@ describe('unbounded hex navigation', () => {
       }
   });
 
-  it('keeps note ownership while another finger pans and hands off without a jump', () => {
+  it('pauses panning during a chord and resumes from the remaining contact without a jump', () => {
     const contacts = new GridContacts();
     contacts.start(1, { q: 0, r: 0 }, { x: 0, y: 0 });
+    expect(contacts.move(1, { x: 10, y: 0 })).toEqual({ x: 10, y: 0 });
     contacts.start(2, { q: 1, r: 0 }, { x: 100, y: 0 });
-    expect(contacts.move(2, { x: 120, y: 25 })).toEqual({ x: 20, y: 25 });
+    expect(contacts.move(2, { x: 120, y: 25 })).toEqual({ x: 0, y: 0 });
     expect(contacts.move(1, { x: 50, y: 10 })).toEqual({ x: 0, y: 0 });
     expect(contacts.active.get(1)?.cell).toEqual({ q: 0, r: 0 });
     expect(contacts.active.get(2)?.cell).toEqual({ q: 1, r: 0 });

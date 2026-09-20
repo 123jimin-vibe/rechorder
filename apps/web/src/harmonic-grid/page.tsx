@@ -120,7 +120,7 @@ export function HarmonicGridPage({
       x: event.clientX,
       y: event.clientY,
     });
-    if (delta.x || delta.y)
+    if (!keyboardNote.current && (delta.x || delta.y))
       setPan((previous) => ({
         x: previous.x + delta.x,
         y: previous.y + delta.y,
@@ -245,13 +245,14 @@ export function HarmonicGridPage({
         </svg>
       </a>
       <p id="grid-instructions" class={styles['srOnly']}>
-        Hold notes to play. Drag while holding to move the grid. Use multiple
-        fingers for chords. Right is a pure fifth; down-right is a Pythagorean
-        major third. With a keyboard, use arrows to choose notes, Space or Enter
-        to hold, and Home to return to C4. Dimmed notes are outside the
-        instrument range. Up and down arrows raise or lower the named
-        Pythagorean note by the exact comma ratio 531441 to 524288. A number
-        beside an arrow counts commas; the lower number is the octave.
+        Hold notes to play. Drag while holding one note to move the grid. Two or
+        more held notes pause movement. Use multiple fingers for chords. Right
+        is a pure fifth; down-right is a Pythagorean major third. With a
+        keyboard, use arrows to choose notes, Space or Enter to hold, and Home
+        to return to C4. Dimmed notes are outside the instrument range. Up and
+        down arrows raise or lower the named Pythagorean note by the exact comma
+        ratio 531441 to 524288. A number beside an arrow counts commas; the
+        lower number is the octave.
       </p>
     </main>
   );
