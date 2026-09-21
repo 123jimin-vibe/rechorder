@@ -60,7 +60,7 @@ title = "Harmonic grid"
 
 ### Open-ended exploration — t0036
 
-- Keep selected collections valid and playable when no conventional name matches. Identify them as unnamed, show their modeled roughness and register span, and show ordered voice movement from the retained previous collection when both are present. Measurements describe the exact sounding frequencies under the documented harmonic-partial model; they are not grades.
+- Keep selected collections valid and playable when no conventional name matches. Identify them as unnamed, show their modeled harmonicity, roughness and register span, and show ordered voice movement from the retained previous collection when both are present. Measurements describe the exact sounding frequencies under the documented harmonic-partial model; they are not grades.
 - In Explore, offer distinct nearby note additions chosen for lower roughness, higher roughness and wider register, plus one octave doubling of a selected pitch class, from an explicit lattice region: fifth-chain classes within four fifths of the selection's range, placed within one octave beyond its register (t0037). Doublings are their own kind because they lower pair-averaged roughness without adding a pitch class. Preserve every selected pitch, its exact identity and the 16-note audition limit. An addition commits to the selection and auditions it. Conventional named completions remain available in the same panel as optional interpretations; absence of a name must not suppress exploration.
 
 ### Verification

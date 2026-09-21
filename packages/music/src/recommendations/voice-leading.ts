@@ -123,7 +123,6 @@ export function chooseVoicing(
   after?: WesternChord,
   fixedBass?: Pitch<WesternPosition>,
   line?: BassLine,
-  explore = false,
 ): Voicing {
   const previous = before ? heights(before) : undefined;
   const following = after ? heights(after) : undefined;
@@ -141,7 +140,7 @@ export function chooseVoicing(
   };
   const basses = fixedBass
     ? [{ kind: 'pitch' as const, pitch: fixedBass }]
-    : line || afterInverted || explore
+    : line || afterInverted
       ? chordTones(chord)
           .filter((tone) => tone.degree <= 7)
           .map((tone) => ({ kind: 'degree' as const, degree: tone.degree }))
@@ -172,7 +171,7 @@ export function chooseVoicing(
       const cost =
         -100 * bassLine +
         movement +
-        (!explore && bass.kind === 'degree' && bass.degree !== 1 ? 10 : 0) +
+        (bass.kind === 'degree' && bass.degree !== 1 ? 10 : 0) +
         (!previous && !following ? Math.abs(octave) : 0);
       if (!best || cost < best.cost)
         best = { chord: voiced, bassLine, movement, cost };

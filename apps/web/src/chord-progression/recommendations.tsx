@@ -10,7 +10,6 @@ import {
 } from '@rechorder/music';
 import type {
   RecommendationFocus,
-  RecommendationLens,
   RecommendationReason,
   TonalKey,
   WesternChord,
@@ -32,12 +31,6 @@ const actions = {
   between: 'Insert',
   bass: 'Use',
 } as const;
-const lenses: Readonly<Record<RecommendationLens, string>> = {
-  explore: 'Varied',
-  blend: 'Blend',
-  contrast: 'Contrast',
-  tonal: 'Tonal',
-};
 const modeNames = {
   next: 'Suggest next chords',
   replace: 'Suggest replacements',
@@ -127,7 +120,6 @@ export function Recommendations({
       : mode;
   const bassCandidate = activeMode === 'bass' ? candidate : undefined;
   const [focus, setFocus] = useState<RecommendationFocus>();
-  const [lens, setLens] = useState<RecommendationLens>('explore');
   // Moves need a neighbor; the first chord has none.
   const activeFocus = progression.length ? focus : undefined;
   const result = useMemo(
@@ -150,11 +142,10 @@ export function Recommendations({
                       ? selectedIndex + 1
                       : progression.length,
                 },
-        lens,
-        // The tonal lens can intentionally begin from the builder's assumed key.
+        // An empty progression intentionally begins from the builder's assumed key.
         ...(tonalKey
           ? { key: tonalKey }
-          : progression.length || lens !== 'tonal'
+          : progression.length
             ? {}
             : { key: assumedKey }),
         ...(activeFocus ? { focus: activeFocus } : {}),
@@ -167,7 +158,6 @@ export function Recommendations({
       bassCandidate,
       tonalKey,
       activeFocus,
-      lens,
     ],
   );
   const [preview, setPreview] = useState<{
@@ -263,22 +253,6 @@ export function Recommendations({
           </button>
         ))}
       </fieldset>
-      <label class={styles['lens']}>
-        Explore by
-        <select
-          aria-label="Suggestion lens"
-          value={lens}
-          onChange={(event) =>
-            setLens(event.currentTarget.value as RecommendationLens)
-          }
-        >
-          {(Object.keys(lenses) as RecommendationLens[]).map((value) => (
-            <option key={value} value={value}>
-              {lenses[value]}
-            </option>
-          ))}
-        </select>
-      </label>
       <fieldset class={styles['focus']} aria-label="Suggestion move">
         <button
           type="button"
@@ -328,16 +302,9 @@ export function Recommendations({
                 ? [reasonLabel(move)]
                 : []),
           ];
-          const assessment = item.assessment;
-          const texture = assessment
-            ? `Modeled roughness ${assessment.roughness.toFixed(3)} · span ${assessment.spanSemitones.toFixed(1)} semitones${assessment.movementSemitones === null ? '' : ` · voice movement ${assessment.movementSemitones.toFixed(1)} semitones`}`
-            : '';
-          const detail =
-            lens === 'explore'
-              ? `${item.basis === 'voices' ? 'Smooth voices' : lenses[item.basis ?? 'explore']} · ${texture}`
-              : lens === 'tonal'
-                ? primary.join(' · ') || reasons[0]!
-                : texture;
+          const { assessment } = item;
+          const texture = `Modeled harmonicity ${assessment.harmonicity.toFixed(2)} · roughness ${assessment.roughness.toFixed(3)} at a C4 bass${assessment.movementSemitones === null ? '' : ` · voice movement ${assessment.movementSemitones.toFixed(1)} semitones`}`;
+          const detail = primary.join(' · ') || reasons[0]!;
           return (
             <li key={index}>
               <div className={styles['suggestion']}>
@@ -348,7 +315,7 @@ export function Recommendations({
                   aria-pressed={
                     preview?.result === result && preview.index === index
                   }
-                  title={[texture, ...reasons].filter(Boolean).join(' · ')}
+                  title={[...reasons, texture].join(' · ')}
                   onClick={() => {
                     setPreview({ result, index });
                     onPreview(item.chord);
@@ -364,16 +331,14 @@ export function Recommendations({
                     <MusicalText text={detail} />
                   </small>
                 </button>
-                {lens !== 'explore' && (
-                  <meter
-                    class={styles['score']}
-                    aria-label={`Relative score for ${symbol}`}
-                    min={0}
-                    max={100}
-                    value={relativeScore}
-                    title={`Relative ${lenses[lens].toLowerCase()} score ${relativeScore}/100 · model ${item.score.toFixed(2)}`}
-                  />
-                )}
+                <meter
+                  class={styles['score']}
+                  aria-label={`Relative score for ${symbol}`}
+                  min={0}
+                  max={100}
+                  value={relativeScore}
+                  title={`Relative score ${relativeScore}/100 · heuristic ${item.score.toFixed(2)}`}
+                />
               </div>
               <button
                 type="button"

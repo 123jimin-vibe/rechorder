@@ -14,12 +14,16 @@ export const hasInterval = (chord: WesternChord, interval: number) =>
   );
 export const hasThird = (chord: WesternChord) =>
   hasInterval(chord, 3) || hasInterval(chord, 4);
-/** Ninths and beyond, plus added sixths: colour that context must justify. */
+/** Ninths and beyond, added sixths, and seconds or fourths added beside a third:
+ * colour that context must justify. An added second is the ninth's pitch class.
+ */
 export const isExtended = (chord: WesternChord) =>
   chord.definition.intervals.some(
     (value) =>
       value.chromaticSteps > 12 ||
-      (value.diatonicSteps === 5 && value.chromaticSteps === 9),
+      (value.diatonicSteps === 5 && value.chromaticSteps === 9) ||
+      ((value.diatonicSteps === 1 || value.diatonicSteps === 3) &&
+        hasThird(chord)),
   );
 
 /** Root moves shared by the ranker and the design controls. */

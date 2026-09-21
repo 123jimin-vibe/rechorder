@@ -67,7 +67,6 @@ export type {
   RecommendationTarget,
   RecommendationRequest,
   RecommendationFocus,
-  RecommendationLens,
   RecommendationReason,
   RecommendationScore,
   ChordRecommendation,

@@ -9,19 +9,16 @@ import {
   inferTonality,
   isAuditionable,
   motion,
-  recommendChords as scoreChords,
+  recommendChords,
   measureSonority,
   voiceMotion,
   roots,
   setToneVoicing,
+  standardTuning,
   voiceChord,
   voiceLeadingDistance,
 } from '@rechorder/music';
-import type {
-  RecommendationRequest,
-  TonalKey,
-  WesternChord,
-} from '@rechorder/music';
+import type { TonalKey, WesternChord } from '@rechorder/music';
 import { chromaticPosition } from '../../packages/music/src/western';
 
 const key = (id: string, mode: TonalKey['mode'] = 'major'): TonalKey => ({
@@ -29,61 +26,86 @@ const key = (id: string, mode: TonalKey['mode'] = 'major'): TonalKey => ({
   mode,
 });
 const c = createChord;
-const recommendChords = (request: RecommendationRequest) =>
-  scoreChords({ ...request, lens: 'tonal' });
 const names = (chords: readonly { chord: WesternChord }[]) =>
   chords.map((item) => chordSymbol(item.chord));
 
 describe('contextual recommendations', () => {
-  it('measures arbitrary sounding collections and distinguishes register and transition', () => {
-    expect(measureSonority([])).toEqual({ roughness: 0, spanCents: 0 });
+  it('measures arbitrary sounding collections: harmonicity is register-free, roughness is not', () => {
+    expect(measureSonority([])).toEqual({
+      roughness: 0,
+      harmonicity: 0,
+      spanCents: 0,
+    });
     const low = measureSonority([220, 275, 330, 440, 466]);
     const high = measureSonority([440, 550, 660, 880, 932]);
     expect(low.spanCents).toBeCloseTo(high.spanCents);
     expect(low.roughness).not.toBeCloseTo(high.roughness);
+    expect(low.harmonicity).toBeCloseTo(high.harmonicity);
+    const sound = (chord: WesternChord) =>
+      voiceChord(chord).map((pitch) =>
+        standardTuning.frequency(pitch.position),
+      );
+    const major = measureSonority(sound(c('C', 'major')));
+    expect(measureSonority(sound(c('C', 'sus4'))).harmonicity).toBeGreaterThan(
+      major.harmonicity,
+    );
+    expect(
+      measureSonority(sound(c('C', 'augmented'))).harmonicity,
+    ).toBeLessThan(major.harmonicity);
+    expect(
+      measureSonority(sound(c('C', 'diminished7'))).harmonicity,
+    ).toBeLessThan(measureSonority(sound(c('C', 'dominant7'))).harmonicity);
+    expect(measureSonority([1]).harmonicity).toBeCloseTo(1);
     expect(voiceMotion([220, 330], [220, 330])).toBe(0);
     expect(voiceMotion([220, 330], [230, 350])).toBeLessThan(
       voiceMotion([220, 330], [440, 660]),
     );
   });
-  it('offers distinct acoustic and tonal lenses without a named-chord goodness claim', () => {
+  it('ranks conventional harmony first while measuring every candidate acoustically', () => {
     const request = {
       progression: [c('C', 'major'), c('G', 'major')],
       target: { kind: 'insert' as const, index: 2 },
       key: key('C'),
     };
-    const varied = scoreChords(request);
-    expect(varied.recommendations.map((item) => item.basis)).toEqual([
-      'blend',
-      'contrast',
-      'voices',
-      'tonal',
-    ]);
-    expect(varied.recommendations.every((item) => item.score === 0)).toBe(true);
-    expect(
-      varied.recommendations.every((item) => item.assessment !== undefined),
-    ).toBe(true);
-    expect(
-      new Set(varied.recommendations.map((item) => item.chord.root.spelling))
-        .size,
-    ).toBe(4);
-    const blended = scoreChords({ ...request, lens: 'blend' });
-    const contrasted = scoreChords({ ...request, lens: 'contrast' });
-    expect(
-      contrasted.recommendations[0]!.assessment!.roughnessChange,
-    ).toBeGreaterThan(blended.recommendations[0]!.assessment!.roughnessChange!);
-    for (const result of [blended, contrasted]) {
-      const scores = result.recommendations.map((item) => item.score);
-      expect(scores).toEqual([...scores].sort((a, b) => b - a));
-      for (const item of result.recommendations)
-        expect(item.score).toBeCloseTo(
-          Object.values(item.components).reduce((a, b) => a + b, 0),
-        );
+    const result = recommendChords(request);
+    expect(names(result.recommendations).slice(0, 3)).toEqual(['C', 'F', 'Am']);
+    expect(result.recommendations[0]!.chord.root.spelling).toBe('C4');
+    for (const item of result.recommendations) {
+      expect(item.score).toBeCloseTo(
+        Object.values(item.components).reduce((a, b) => a + b, 0),
+      );
+      expect(item.assessment.harmonicity).toBeGreaterThan(0);
     }
-    const generated = scoreChords({
-      progression: [],
-      target: { kind: 'insert', index: 0 },
-      lens: 'contrast',
+    // A plain triad is the zero of the acoustic term; a stacked-second edit of
+    // the same harmony costs, and an augmented triad costs through harmonicity.
+    const wide = recommendChords({ ...request, limit: 24 }).recommendations;
+    const triad = wide.find((item) => chordSymbol(item.chord) === 'C')!;
+    const cluster = wide.find((item) => chordSymbol(item.chord) === 'C(add2)');
+    const augmented = wide.find((item) => chordSymbol(item.chord) === 'Caug');
+    expect(triad.components.acoustic).toBeCloseTo(0);
+    if (cluster) expect(cluster.components.acoustic).toBeLessThan(-0.5);
+    if (augmented) expect(augmented.components.acoustic).toBeLessThan(-0.2);
+    expect(
+      recommendChords({
+        progression: [],
+        target: { kind: 'insert', index: 0 },
+        key: key('C'),
+      }).recommendations.map((item) => chordSymbol(item.chord)),
+    ).toEqual(['C', 'G', 'F', 'Am']);
+    expect(
+      names(
+        recommendChords({
+          progression: [c('C', 'major')],
+          target: { kind: 'insert', index: 1 },
+          key: key('C'),
+        }).recommendations,
+      ),
+    ).toEqual(['F', 'G', 'Am', 'Em']);
+    // Added-tone edits stay in the pool and persist through the recipe grammar.
+    const generated = recommendChords({
+      progression: [c('D', 'minor7'), c('G', 'dominant7')],
+      target: { kind: 'insert', index: 2 },
+      key: key('C'),
       limit: 24,
     });
     const edited = generated.recommendations.find(
@@ -91,11 +113,8 @@ describe('contextual recommendations', () => {
     )?.chord;
     expect(edited).toBeDefined();
     expect(chordFromData(chordData(edited!))).toEqual(edited);
-    expect(
-      recommendChords(request).recommendations[0]!.chord.root.spelling,
-    ).toBe('C4');
   });
-  it('never suggests dyads or an adjacent chord, in any lens', () => {
+  it('never suggests dyads or an adjacent chord', () => {
     const classes = (chord: WesternChord) =>
       [
         ...new Set(
@@ -112,37 +131,20 @@ describe('contextual recommendations', () => {
       { progression: [c('A', 'minor'), c('F', 'major')], withKey: false },
       { progression: [], withKey: false },
     ];
-    for (const { progression, withKey } of contexts)
-      for (const lens of ['explore', 'blend', 'contrast', 'tonal'] as const) {
-        const neighbor = progression.at(-1);
-        const { recommendations } = scoreChords({
-          progression,
-          target: { kind: 'insert', index: progression.length },
-          lens,
-          limit: 8,
-          ...(withKey ? { key: key('C') } : {}),
-        });
-        expect(recommendations.length).toBeGreaterThan(0);
-        for (const item of recommendations) {
-          expect(classes(item.chord).split(',').length).toBeGreaterThanOrEqual(
-            3,
-          );
-          if (neighbor)
-            expect(identity(item.chord)).not.toBe(identity(neighbor));
-        }
+    for (const { progression, withKey } of contexts) {
+      const neighbor = progression.at(-1);
+      const { recommendations } = recommendChords({
+        progression,
+        target: { kind: 'insert', index: progression.length },
+        limit: 12,
+        ...(withKey ? { key: key('C') } : {}),
+      });
+      expect(recommendations.length).toBeGreaterThan(0);
+      for (const item of recommendations) {
+        expect(classes(item.chord).split(',').length).toBeGreaterThanOrEqual(3);
+        if (neighbor) expect(identity(item.chord)).not.toBe(identity(neighbor));
       }
-    // Varied's blend and contrast picks are the two ends of the same terms.
-    const varied = scoreChords({
-      progression: [c('C', 'major'), c('G', 'major')],
-      target: { kind: 'insert', index: 2 },
-      key: key('C'),
-    }).recommendations;
-    const blend = varied.find((item) => item.basis === 'blend')!.assessment!;
-    const contrast = varied.find(
-      (item) => item.basis === 'contrast',
-    )!.assessment!;
-    expect(blend.roughnessChange).toBeLessThan(contrast.roughnessChange!);
-    expect(blend.movementSemitones).toBeLessThan(contrast.movementSemitones!);
+    }
   });
   it('distinguishes dominant sevenths and ii–V from plain fifth motion', () => {
     expect(motion(c('G', 'dominant7'), c('C', 'major')).move).toBe('dominant');
@@ -609,7 +611,7 @@ describe('contextual recommendations', () => {
       target: { kind: 'insert', index: 1 },
       key: key('C'),
       focus: 'color',
-      limit: 8,
+      limit: 12,
     });
     expect(names(result.recommendations)).toContain('C♯dim');
     expect(names(result.recommendations)).not.toContain('D♭dim');

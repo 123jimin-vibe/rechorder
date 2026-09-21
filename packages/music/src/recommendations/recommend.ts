@@ -47,14 +47,12 @@ export type RecommendationTarget =
  * borrowed harmony only.
  */
 export type RecommendationFocus = Move | 'color';
-export type RecommendationLens = 'explore' | 'blend' | 'contrast' | 'tonal';
 export interface RecommendationRequest {
   readonly progression: readonly WesternChord[];
   readonly target: RecommendationTarget;
   readonly key?: TonalKey;
   readonly focus?: RecommendationFocus;
   readonly limit?: number;
-  readonly lens?: RecommendationLens;
 }
 export type RecommendationReason =
   | {
@@ -80,21 +78,23 @@ export interface RecommendationScore {
   readonly complexity: number;
   /** Diversity penalty against the suggestions listed before this one. */
   readonly variety: number;
-  /** Only the selected acoustic lens contributes these terms. */
-  readonly acoustic?: number;
-  readonly transition?: number;
+  /** Harmonicity of the chosen voicing relative to a major triad, minus its
+   * roughness in excess of the neighbors'. Measured on sounding frequencies.
+   */
+  readonly acoustic: number;
 }
 export interface ChordRecommendation {
   readonly chord: WesternChord;
   readonly score: number;
   readonly components: RecommendationScore;
   readonly reasons: readonly RecommendationReason[];
-  readonly basis?: 'blend' | 'contrast' | 'voices' | 'tonal';
-  readonly assessment?: {
+  /** Model descriptors of the chosen voicing; see docs/chord-recommendations.md. */
+  readonly assessment: {
+    /** Of the voicing with its bass shifted to C4, comparable across registers. */
     readonly roughness: number;
+    readonly harmonicity: number;
     readonly spanSemitones: number;
     readonly movementSemitones: number | null;
-    readonly roughnessChange: number | null;
   };
 }
 export interface RecommendationResult {
@@ -112,15 +112,27 @@ const harmonicIdentity = (chord: WesternChord) =>
 const frequencies = (chord: WesternChord) =>
   voiceChord(chord).map((pitch) => standardTuning.frequency(pitch.position));
 
+/** The root-position close C major triad is the zero of the acoustic term:
+ * conventional consonant chords score near 0, so the term separates sonorities
+ * the tonal terms cannot (augmented, clustered, over-stacked) without
+ * re-ranking the idiomatic ones. Harmonicity is register-free. Roughness rises
+ * in low registers under the partial model, so each voicing is measured with
+ * its bass shifted to C4: the term reads interval structure, not the octave the
+ * voice-leading search chose. Only roughness above the triad's costs; a hollow
+ * or high voicing earns nothing for being smooth.
+ */
+const referenceTriad = measureSonority(frequencies(createChord('C', 'major')));
+const referenceBass = frequencies(createChord('C', 'major'))[0]!;
+const harmonicityWeight = 3;
+const roughnessWeight = 12;
+
 function assessSoundingChord(
   chord: WesternChord,
-  before?: WesternChord,
-  after?: WesternChord,
-) {
+  neighbors: readonly WesternChord[],
+): ChordRecommendation['assessment'] {
   const sound = frequencies(chord);
-  const profile = measureSonority(sound);
-  const neighbors = [before, after].filter(
-    (value): value is WesternChord => value !== undefined,
+  const profile = measureSonority(
+    sound.map((frequency) => (frequency * referenceBass) / sound[0]!),
   );
   const movement = neighbors.length
     ? neighbors.reduce(
@@ -130,41 +142,20 @@ function assessSoundingChord(
       neighbors.length /
       100
     : null;
-  const roughnessChange = neighbors.length
-    ? neighbors.reduce(
-        (sum, value) =>
-          sum +
-          Math.abs(
-            profile.roughness - measureSonority(frequencies(value)).roughness,
-          ),
-        0,
-      ) / neighbors.length
-    : null;
   return {
     roughness: profile.roughness,
+    harmonicity: profile.harmonicity,
     spanSemitones: profile.spanCents / 100,
     movementSemitones: movement,
-    roughnessChange,
   };
 }
 
-type Assessment = NonNullable<ChordRecommendation['assessment']>;
-
-/** Blend and Contrast are the same two descriptors with opposite signs: the
- * roughness trajectory relative to the neighbors (n0005 §3) and the actual voice
- * movement. Absolute roughness is only the fallback when nothing surrounds the
- * target. Varied uses the same terms so its blend and contrast picks agree with
- * the weighted lenses.
- */
-function acousticTerms(
-  lens: 'blend' | 'contrast',
-  assessment: Assessment,
-): { acoustic: number; transition: number } {
-  const sign = lens === 'blend' ? -1 : 1;
-  return {
-    acoustic: sign * 3 * (assessment.roughnessChange ?? assessment.roughness),
-    transition: sign * 0.25 * (assessment.movementSemitones ?? 0),
-  };
+function acousticScore(assessment: ChordRecommendation['assessment']): number {
+  return (
+    harmonicityWeight * (assessment.harmonicity - referenceTriad.harmonicity) -
+    roughnessWeight *
+      Math.max(0, assessment.roughness - referenceTriad.roughness)
+  );
 }
 
 function interpretationIdentity(item: ChordRecommendation): string {
@@ -265,7 +256,6 @@ export function recommendChords(
   request: RecommendationRequest,
 ): RecommendationResult {
   const { progression, target, focus } = request;
-  const lens = request.lens ?? 'explore';
   const { index } = target;
   if (
     !Number.isInteger(index) ||
@@ -304,6 +294,9 @@ export function recommendChords(
   const fixedBass =
     target.kind === 'bass' ? voiceChord(target.chord)[0] : undefined;
   const neighbor = before ?? after ?? original;
+  const neighbors = [before, after].filter(
+    (value): value is WesternChord => value !== undefined,
+  );
   const line = detectBassLine(before, earlier);
   const vocabulary = [...chordDefinitions, ...jazzDefinitions];
   const roots = recommendationRoots(context, [
@@ -323,38 +316,33 @@ export function recommendChords(
   // Generate one-note edits from simple independent seeds and the musician's
   // neighboring material. These use the editor's persistable recipe operations;
   // they are not another list of pre-named chord examples.
-  const edits =
-    lens === 'tonal'
-      ? []
-      : [
-          ...roots.flatMap((root) =>
-            (['major', 'minor'] as const).map((id) => ({
-              ...createChord('C', id),
-              root,
-            })),
-          ),
-          ...[before, after, original].filter(
-            (value): value is WesternChord => value !== undefined,
-          ),
-        ].flatMap((seed) => {
-          const { bass: _bass, ...base } = seed;
-          const chord = {
-            ...base,
-            voicing: { kind: 'close' as const, octave: 0, tones: [] },
-          };
-          return [
-            ...[2, 4, 6, 9, 11, 13].map((degree) =>
-              setChordDegree(chord, degree, true),
-            ),
-            ...[3, 5].map((degree) => setChordDegree(chord, degree, false)),
-          ].filter(
-            (edited) => harmonicIdentity(edited) !== harmonicIdentity(chord),
-          );
-        });
-  // Declared candidate policy for every lens: a suggestion is a harmony of at
-  // least three pitch classes, and it is not one of the chords it sits beside.
-  // Pair-averaged roughness is not comparable across cardinalities (n0005 §2), so
-  // dyads produced by omit edits would otherwise win both acoustic extremes.
+  const edits = [
+    ...roots.flatMap((root) =>
+      (['major', 'minor'] as const).map((id) => ({
+        ...createChord('C', id),
+        root,
+      })),
+    ),
+    ...[before, after, original].filter(
+      (value): value is WesternChord => value !== undefined,
+    ),
+  ].flatMap((seed) => {
+    const { bass: _bass, ...base } = seed;
+    const chord = {
+      ...base,
+      voicing: { kind: 'close' as const, octave: 0, tones: [] },
+    };
+    return [
+      ...[2, 4, 6, 9, 11, 13].map((degree) =>
+        setChordDegree(chord, degree, true),
+      ),
+      ...[3, 5].map((degree) => setChordDegree(chord, degree, false)),
+    ].filter((edited) => harmonicIdentity(edited) !== harmonicIdentity(chord));
+  });
+  // Declared candidate policy: a suggestion is a harmony of at least three pitch
+  // classes, and it is not one of the chords it sits beside. Pair-averaged
+  // roughness is not comparable across cardinalities (n0005 §2), and repeating a
+  // neighbor is not a suggestion.
   const excluded = new Set(
     [original, before, after]
       .filter((value): value is WesternChord => value !== undefined)
@@ -464,6 +452,7 @@ export function recommendChords(
           similarity,
           complexity,
           variety: 0,
+          acoustic: 0,
         },
         score: role + motionScore + voiceLeading + similarity + complexity,
       };
@@ -482,10 +471,9 @@ export function recommendChords(
     })
     .sort((a, b) => b.score - a.score);
 
-  // Harmonic preselection caps the more expensive concrete-voicing search.
-  const voiced = (
-    lens === 'tonal' ? pool.slice(0, Math.max(48, limit * 3)) : pool
-  )
+  // Every harmony is voiced and measured: the acoustic term is the only way an
+  // unconventional chord can climb, so it must be assessed, not preselected out.
+  const voiced = pool
     .map((item): ChordRecommendation => {
       const chosen = chooseVoicing(
         item.chord,
@@ -493,7 +481,6 @@ export function recommendChords(
         after,
         fixedBass,
         line,
-        lens !== 'tonal',
       );
       // A stepping bass helps a plausible chord; it does not rescue an implausible one.
       const bassLine =
@@ -505,28 +492,12 @@ export function recommendChords(
           ? [{ kind: 'smooth-voices' } as const]
           : []),
       ];
-      const assessment = assessSoundingChord(chosen.chord, before, after);
-      const { acoustic, transition } =
-        lens === 'blend' || lens === 'contrast'
-          ? acousticTerms(lens, assessment)
-          : { acoustic: 0, transition: 0 };
+      const assessment = assessSoundingChord(chosen.chord, neighbors);
+      const acoustic = acousticScore(assessment);
       return {
         chord: chosen.chord,
-        score: lens === 'tonal' ? item.score + bassLine : acoustic + transition,
-        components:
-          lens === 'tonal' || lens === 'explore'
-            ? { ...item.components, bassLine }
-            : {
-                role: 0,
-                motion: 0,
-                bassLine: 0,
-                voiceLeading: 0,
-                similarity: 0,
-                complexity: 0,
-                variety: 0,
-                acoustic,
-                transition,
-              },
+        score: item.score + bassLine + acoustic,
+        components: { ...item.components, bassLine, acoustic },
         assessment,
         reasons:
           reasons.length > 1
@@ -543,55 +514,6 @@ export function recommendChords(
     );
 
   const distinctVoicings = deduplicateEquivalentVoicings(voiced);
-  if (lens === 'explore') {
-    const chosen: ChordRecommendation[] = [];
-    const remaining = [...distinctVoicings];
-    const choose = (
-      basis: NonNullable<ChordRecommendation['basis']>,
-      criterion: (item: ChordRecommendation) => number,
-    ) => {
-      remaining.sort((a, b) => criterion(b) - criterion(a));
-      const index = remaining.findIndex(
-        (item) =>
-          !chosen.some(
-            (value) =>
-              pitchClass(value.chord.root) === pitchClass(item.chord.root),
-          ),
-      );
-      const [item] = remaining.splice(index < 0 ? 0 : index, 1);
-      if (item)
-        chosen.push({
-          ...item,
-          basis,
-          // A varied set has no shared scalar objective or score components.
-          score: 0,
-          components: {
-            role: 0,
-            motion: 0,
-            bassLine: 0,
-            voiceLeading: 0,
-            similarity: 0,
-            complexity: 0,
-            variety: 0,
-          },
-        });
-    };
-    const lensTotal =
-      (basis: 'blend' | 'contrast') => (item: ChordRecommendation) => {
-        const terms = acousticTerms(basis, item.assessment!);
-        return terms.acoustic + terms.transition;
-      };
-    if (limit) choose('blend', lensTotal('blend'));
-    if (chosen.length < limit && remaining.length)
-      choose('contrast', lensTotal('contrast'));
-    if (chosen.length < limit && remaining.length)
-      choose('voices', (item) => -(item.assessment!.movementSemitones ?? 0));
-    if (chosen.length < limit && remaining.length)
-      choose('tonal', (item) => item.components.role + item.components.motion);
-    while (chosen.length < limit && remaining.length)
-      choose('contrast', lensTotal('contrast'));
-    return { context, recommendations: chosen };
-  }
 
   // Greedy diversity reranking keeps useful alternatives across roots, basses and
   // pitch sets; the penalty is reported as `variety` so rank and score agree. A

@@ -439,6 +439,7 @@ export function HarmonicGridPage({
         </div>
         {candidate.length > 0 && (
           <div class={styles['texture']} aria-label="Chord texture">
+            <span>Harmonicity {profile.harmonicity.toFixed(2)}</span>
             <span>Roughness {profile.roughness.toFixed(3)}</span>
             <span>Span {(profile.spanCents / 100).toFixed(1)} semitones</span>
             {movement !== null && (

@@ -28,13 +28,6 @@ test('optional key settings stay silent; previews leave edits untouched and comm
     .getByRole('combobox', { name: 'Mode', exact: true })
     .selectOption('minor');
   expect(await page.evaluate(() => window.audioProbe.resumeCalls)).toBe(0);
-  await expect(
-    panel.getByRole('combobox', { name: 'Suggestion lens' }),
-  ).toHaveValue('explore');
-  await expect(panel.getByRole('meter')).toHaveCount(0);
-  await panel
-    .getByRole('combobox', { name: 'Suggestion lens' })
-    .selectOption('blend');
   const meters = panel.getByRole('meter', {
     name: /^Relative score for /,
   });
@@ -279,9 +272,6 @@ test('function pads design key-relative chords and move chips narrow suggestions
     .getByRole('combobox', { name: 'Key', exact: true })
     .selectOption('C');
   await expect(pads.locator('legend')).toHaveText('Function C major');
-  await panel
-    .getByRole('combobox', { name: 'Suggestion lens' })
-    .selectOption('tonal');
   await panel.getByRole('button', { name: 'ii–V motion' }).click();
   const previews = panel.getByRole('button', { name: /^Preview / });
   await expect(previews.first()).toHaveAccessibleName('Preview G7');
