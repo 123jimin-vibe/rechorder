@@ -148,6 +148,25 @@ function assessSoundingChord(
   };
 }
 
+type Assessment = NonNullable<ChordRecommendation['assessment']>;
+
+/** Blend and Contrast are the same two descriptors with opposite signs: the
+ * roughness trajectory relative to the neighbors (n0005 §3) and the actual voice
+ * movement. Absolute roughness is only the fallback when nothing surrounds the
+ * target. Varied uses the same terms so its blend and contrast picks agree with
+ * the weighted lenses.
+ */
+function acousticTerms(
+  lens: 'blend' | 'contrast',
+  assessment: Assessment,
+): { acoustic: number; transition: number } {
+  const sign = lens === 'blend' ? -1 : 1;
+  return {
+    acoustic: sign * 3 * (assessment.roughnessChange ?? assessment.roughness),
+    transition: sign * 0.25 * (assessment.movementSemitones ?? 0),
+  };
+}
+
 function interpretationIdentity(item: ChordRecommendation): string {
   return item.reasons
     .flatMap((reason) =>
@@ -332,10 +351,19 @@ export function recommendChords(
             (edited) => harmonicIdentity(edited) !== harmonicIdentity(chord),
           );
         });
+  // Declared candidate policy for every lens: a suggestion is a harmony of at
+  // least three pitch classes, and it is not one of the chords it sits beside.
+  // Pair-averaged roughness is not comparable across cardinalities (n0005 §2), so
+  // dyads produced by omit edits would otherwise win both acoustic extremes.
+  const excluded = new Set(
+    [original, before, after]
+      .filter((value): value is WesternChord => value !== undefined)
+      .map(harmonicIdentity),
+  );
   const pool = [...catalogue, ...edits]
     .filter((chord) => {
-      if (original && harmonicIdentity(chord) === harmonicIdentity(original))
-        return false;
+      if (pitchClasses(chord).length < 3) return false;
+      if (excluded.has(harmonicIdentity(chord))) return false;
       // Fixed-bass choices include inversions of every catalogue quality. Keep the
       // bass a chord member; an arbitrary slash under every chord is not a useful match.
       return !fixedBass || pitchClasses(chord).includes(pitchClass(fixedBass));
@@ -405,18 +433,12 @@ export function recommendChords(
         (-0.5 * movement) / (Number(!!before) + Number(!!after) || 1);
       const similarity = original ? commonToneCount(chord, original) * 0.45 : 0;
       // Match the local vocabulary's density; thinning is a lighter mismatch than
-      // thickening, since a triad is never foreign. Penalize repeating recent harmony.
+      // thickening, since a triad is never foreign. Penalize repeating a neighbor's
+      // root; repeating its harmony is excluded from the pool above.
       const density = neighbor?.definition.intervals.length ?? 3;
       const size = chord.definition.intervals.length;
-      const identity = harmonicIdentity(chord);
       const repeats = (value: WesternChord | undefined) =>
-        !value
-          ? 0
-          : identity === harmonicIdentity(value)
-            ? 3
-            : pitchClass(value.root) === pitchClass(chord.root)
-              ? 1.5
-              : 0;
+        value && pitchClass(value.root) === pitchClass(chord.root) ? 1.5 : 0;
       const complexity =
         -0.7 * Math.max(0, size - density) -
         0.3 * Math.max(0, density - size) -
@@ -484,16 +506,10 @@ export function recommendChords(
           : []),
       ];
       const assessment = assessSoundingChord(chosen.chord, before, after);
-      const acoustic =
-        lens === 'blend'
-          ? -3 * assessment.roughness
-          : lens === 'contrast'
-            ? 3 * (assessment.roughnessChange ?? assessment.roughness)
-            : 0;
-      const transition =
-        (lens === 'blend' ? -1 : lens === 'contrast' ? 1 : 0) *
-        0.25 *
-        (assessment.movementSemitones ?? 0);
+      const { acoustic, transition } =
+        lens === 'blend' || lens === 'contrast'
+          ? acousticTerms(lens, assessment)
+          : { acoustic: 0, transition: 0 };
       return {
         chord: chosen.chord,
         score: lens === 'tonal' ? item.score + bassLine : acoustic + transition,
@@ -560,24 +576,20 @@ export function recommendChords(
           },
         });
     };
-    if (limit) choose('blend', (item) => -item.assessment!.roughness);
+    const lensTotal =
+      (basis: 'blend' | 'contrast') => (item: ChordRecommendation) => {
+        const terms = acousticTerms(basis, item.assessment!);
+        return terms.acoustic + terms.transition;
+      };
+    if (limit) choose('blend', lensTotal('blend'));
     if (chosen.length < limit && remaining.length)
-      choose(
-        'contrast',
-        (item) =>
-          item.assessment!.roughnessChange ?? item.assessment!.roughness,
-      );
+      choose('contrast', lensTotal('contrast'));
     if (chosen.length < limit && remaining.length)
       choose('voices', (item) => -(item.assessment!.movementSemitones ?? 0));
     if (chosen.length < limit && remaining.length)
       choose('tonal', (item) => item.components.role + item.components.motion);
-    while (chosen.length < limit && remaining.length) {
-      choose(
-        'contrast',
-        (item) =>
-          item.assessment!.roughnessChange ?? item.assessment!.roughness,
-      );
-    }
+    while (chosen.length < limit && remaining.length)
+      choose('contrast', lensTotal('contrast'));
     return { context, recommendations: chosen };
   }
 

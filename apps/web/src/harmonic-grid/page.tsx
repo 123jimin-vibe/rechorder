@@ -547,7 +547,9 @@ export function HarmonicGridPage({
                           ? 'Blend'
                           : kind === 'edge'
                             ? 'More roughness'
-                            : 'Wider range';
+                            : kind === 'wider'
+                              ? 'Wider range'
+                              : 'Doubling';
                       return (
                         <button
                           type="button"

@@ -95,6 +95,55 @@ describe('contextual recommendations', () => {
       recommendChords(request).recommendations[0]!.chord.root.spelling,
     ).toBe('C4');
   });
+  it('never suggests dyads or an adjacent chord, in any lens', () => {
+    const classes = (chord: WesternChord) =>
+      [
+        ...new Set(
+          voiceChord(chord).map((p) => chromaticPosition(p.position) % 12),
+        ),
+      ]
+        .sort((a, b) => a - b)
+        .join(',');
+    const identity = (chord: WesternChord) =>
+      `${chromaticPosition(chord.root.position) % 12}:${classes(chord)}`;
+    const contexts: { progression: WesternChord[]; withKey: boolean }[] = [
+      { progression: [c('C', 'major'), c('G', 'major')], withKey: true },
+      { progression: [c('D', 'minor7'), c('G', 'dominant7')], withKey: true },
+      { progression: [c('A', 'minor'), c('F', 'major')], withKey: false },
+      { progression: [], withKey: false },
+    ];
+    for (const { progression, withKey } of contexts)
+      for (const lens of ['explore', 'blend', 'contrast', 'tonal'] as const) {
+        const neighbor = progression.at(-1);
+        const { recommendations } = scoreChords({
+          progression,
+          target: { kind: 'insert', index: progression.length },
+          lens,
+          limit: 8,
+          ...(withKey ? { key: key('C') } : {}),
+        });
+        expect(recommendations.length).toBeGreaterThan(0);
+        for (const item of recommendations) {
+          expect(classes(item.chord).split(',').length).toBeGreaterThanOrEqual(
+            3,
+          );
+          if (neighbor)
+            expect(identity(item.chord)).not.toBe(identity(neighbor));
+        }
+      }
+    // Varied's blend and contrast picks are the two ends of the same terms.
+    const varied = scoreChords({
+      progression: [c('C', 'major'), c('G', 'major')],
+      target: { kind: 'insert', index: 2 },
+      key: key('C'),
+    }).recommendations;
+    const blend = varied.find((item) => item.basis === 'blend')!.assessment!;
+    const contrast = varied.find(
+      (item) => item.basis === 'contrast',
+    )!.assessment!;
+    expect(blend.roughnessChange).toBeLessThan(contrast.roughnessChange!);
+    expect(blend.movementSemitones).toBeLessThan(contrast.movementSemitones!);
+  });
   it('distinguishes dominant sevenths and ii–V from plain fifth motion', () => {
     expect(motion(c('G', 'dominant7'), c('C', 'major')).move).toBe('dominant');
     expect(motion(c('G', 'major7'), c('C', 'major')).move).toBe('fifth-down');

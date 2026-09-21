@@ -123,9 +123,34 @@ describe('chord design musical identity', () => {
     const unnamed = [-2, -1, 0, 1, 2].map((fifths) => ({ fifths, octaves: 0 }));
     expect(chordCompletions(unnamed)).toEqual([]);
     const ideas = exploreAdditions(unnamed);
-    expect(ideas.map((item) => item.kind)).toEqual(['blend', 'edge', 'wider']);
-    expect(new Set(ideas.map((item) => pitchId(item.note))).size).toBe(3);
+    expect(ideas.map((item) => item.kind)).toEqual([
+      'blend',
+      'edge',
+      'wider',
+      'double',
+    ]);
+    expect(new Set(ideas.map((item) => pitchId(item.note))).size).toBe(4);
     expect(ideas.every((item) => item.profile.spanCents > 0)).toBe(true);
+    // Only the doubling repeats a selected pitch class; every addition stays
+    // within one octave beyond the selection's register.
+    const selectedClasses = new Set(unnamed.map((note) => note.fifths));
+    for (const item of ideas)
+      expect(selectedClasses.has(item.note.fifths)).toBe(
+        item.kind === 'double',
+      );
+    const height = (note: { fifths: number; octaves: number }) =>
+      Math.log2(positionNote(note).frequency);
+    const heights = unnamed.map(height);
+    for (const item of ideas) {
+      expect(height(item.note)).toBeGreaterThanOrEqual(
+        Math.min(...heights) - 1,
+      );
+      expect(height(item.note)).toBeLessThanOrEqual(Math.max(...heights) + 1);
+    }
+    // A lone note's blending addition is a new pitch class, not an octave copy.
+    expect(
+      exploreAdditions([c]).find((item) => item.kind === 'blend')?.note,
+    ).not.toEqual(expect.objectContaining({ fifths: 0 }));
     expect(chordProfile(unnamed).roughness).toBeGreaterThan(0);
     expect(chordMovement(unnamed, unnamed)).toBe(0);
     expect(

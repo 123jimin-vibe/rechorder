@@ -17,50 +17,71 @@ export function chordMovement(from: GridChord, to: GridChord): number {
 }
 
 export interface Exploration {
-  readonly kind: 'blend' | 'edge' | 'wider';
+  readonly kind: 'blend' | 'edge' | 'wider' | 'double';
   readonly note: PythagoreanPosition;
   readonly profile: SonorityProfile;
 }
 
-/** Nearby fifth-chain and octave movements, with no quality-template filter. */
+/** Additions from an explicit lattice region, with no quality-template filter:
+ * every fifth-chain class within four fifths of the selection's range (so
+ * thirds, sixths and sevenths of a single note are reachable), placed at every
+ * octave that lands within one octave beyond the selection's register. Fifths
+ * also move register, so the region is bounded in both coordinates. An octave
+ * copy of a selected pitch class is a doubling: it lowers pair-averaged
+ * roughness without adding a pitch class, so it is offered as its own kind
+ * instead of standing in for a blending note.
+ */
 export function exploreAdditions(notes: GridChord): readonly Exploration[] {
   if (!notes.length || notes.length >= 16) return [];
   const seen = new Set(notes.map(pitchId));
+  const classes = new Set(notes.map((note) => note.fifths));
+  const heights = notes.map(pitchHeight);
+  const floor = Math.min(...heights) - 1;
+  const ceiling = Math.max(...heights) + 1;
   const options: { note: PythagoreanPosition; profile: SonorityProfile }[] = [];
-  for (const anchor of notes) {
-    for (let fifths = -2; fifths <= 2; fifths++) {
-      for (let octaves = -1; octaves <= 1; octaves++) {
-        const note = {
-          fifths: anchor.fifths + fifths,
-          octaves: anchor.octaves + octaves,
-        };
-        const id = pitchId(note);
-        if (seen.has(id)) continue;
-        seen.add(id);
-        if (!isPlayable(positionNote(note))) continue;
-        options.push({ note, profile: chordProfile([...notes, note]) });
-      }
+  for (
+    let fifths = Math.min(...classes) - 4;
+    fifths <= Math.max(...classes) + 4;
+    fifths++
+  ) {
+    const base = fifths * Math.log2(1.5);
+    for (
+      let octaves = Math.ceil(floor - base);
+      octaves <= Math.floor(ceiling - base);
+      octaves++
+    ) {
+      const note = { fifths, octaves };
+      if (seen.has(pitchId(note))) continue;
+      seen.add(pitchId(note));
+      if (!isPlayable(positionNote(note))) continue;
+      options.push({ note, profile: chordProfile([...notes, note]) });
     }
   }
   const chosen = new Set<string>();
   const pick = (
     kind: Exploration['kind'],
+    doubling: boolean,
     compare: (
       a: (typeof options)[number],
       b: (typeof options)[number],
     ) => number,
   ): Exploration | undefined => {
     const best = options
-      .filter((option) => !chosen.has(pitchId(option.note)))
+      .filter(
+        (option) =>
+          !chosen.has(pitchId(option.note)) &&
+          classes.has(option.note.fifths) === doubling,
+      )
       .sort(compare)[0];
     if (!best) return undefined;
     chosen.add(pitchId(best.note));
     return { kind, ...best };
   };
   return [
-    pick('blend', (a, b) => a.profile.roughness - b.profile.roughness),
-    pick('edge', (a, b) => b.profile.roughness - a.profile.roughness),
-    pick('wider', (a, b) => b.profile.spanCents - a.profile.spanCents),
+    pick('blend', false, (a, b) => a.profile.roughness - b.profile.roughness),
+    pick('edge', false, (a, b) => b.profile.roughness - a.profile.roughness),
+    pick('wider', false, (a, b) => b.profile.spanCents - a.profile.spanCents),
+    pick('double', true, (a, b) => a.profile.roughness - b.profile.roughness),
   ].filter((item): item is Exploration => item !== undefined);
 }
 const qualities = [
